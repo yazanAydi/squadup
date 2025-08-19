@@ -2,6 +2,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import '../utils/responsive_utils.dart';
+import '../services/image_uploader.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -30,10 +34,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _isLoading = false;
 
   // THEME
-  static const Color bg = Color(0xFF0D0824);
-  static const Color card = Color(0xFF1C1539);
+  static const Color bg = Color(0xFF0A0A0A);
+  static const Color card = Color(0xFF1A1A1A);
   static const Color accent = Color(0xFF8C6CFF);
-  static const Color subtle = Color(0xFFB6A8D9);
+  static const Color subtle = Color(0xFF6B7280);
 
   // Supported sports + positions
   static const List<String> kSports = ['Basketball', 'Soccer', 'Volleyball'];
@@ -71,6 +75,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (uid == null) return;
 
     final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    if (!mounted) return;
+    
     final data = doc.data();
     if (data != null) {
       setState(() {
@@ -127,11 +133,24 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         }
       }
 
-      if (mounted) Navigator.pop(context, true);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile updated successfully!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+        Navigator.pop(context, true);
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error: $e")),
+          SnackBar(
+            content: Text("Error saving profile: ${e.toString()}"),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
         );
       }
     } finally {
@@ -165,7 +184,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (available.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("All supported sports are already added.")),
+          const SnackBar(
+            content: Text("All supported sports are already added."),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 2),
+          ),
         );
       }
       return;
@@ -190,15 +213,30 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Text(
+                editingSport != null ? 'Edit Sport' : 'Add Sport',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 value: selectedSport,
                 dropdownColor: card,
                 decoration: _dropdownDecoration('Sport'),
-                iconEnabledColor: Colors.white,
+                iconEnabledColor: Theme.of(context).colorScheme.onSurface,
                 items: available
                     .map((s) => DropdownMenuItem(
                           value: s,
-                          child: Text(s, style: const TextStyle(color: Colors.white)),
+                          child: Row(
+                            children: [
+                              Image.asset(iconFor(s), width: 20, height: 20),
+                              const SizedBox(width: 8),
+                              Text(s, style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
+                            ],
+                          ),
                         ))
                     .toList(),
                 onChanged: (val) {
@@ -214,11 +252,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 value: selectedPosition,
                 dropdownColor: card,
                 decoration: _dropdownDecoration('Position'),
-                iconEnabledColor: Colors.white,
+                iconEnabledColor: Theme.of(context).colorScheme.onSurface,
                 items: kPositions[selectedSport]!
                     .map((p) => DropdownMenuItem(
                           value: p,
-                          child: Text(p, style: const TextStyle(color: Colors.white)),
+                          child: Text(p, style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
                         ))
                     .toList(),
                 onChanged: (val) => setLocalState(() => selectedPosition = val ?? selectedPosition),
@@ -229,7 +267,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: accent,
-                    foregroundColor: Colors.white,
+                    foregroundColor: Theme.of(context).colorScheme.onSurface,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
@@ -242,8 +280,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     });
                     Navigator.pop(ctx);
                     await _persistSports();
+                    
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(editingSport != null 
+                            ? 'Sport updated successfully!' 
+                            : 'Sport added successfully!'),
+                          backgroundColor: Colors.green,
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    }
                   },
-                  child: const Text('Save'),
+                  child: Text(editingSport != null ? 'Update' : 'Add'),
                 ),
               ),
             ],
@@ -254,8 +304,153 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   void _deleteSport(String sport) async {
-    setState(() => _sports.remove(sport));
-    await _persistSports();
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: card,
+        title: Text('Delete Sport', style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
+        content: Text(
+          'Are you sure you want to remove $sport from your profile?',
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      setState(() => _sports.remove(sport));
+      await _persistSports();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$sport removed from your profile'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  // Show image picker for avatar selection
+  Future<void> _showImagePicker() async {
+    final ImagePicker picker = ImagePicker();
+    final navigator = Navigator.of(context);
+    
+    try {
+      final XFile? image = await showDialog<XFile>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Choose Avatar'),
+          content: const Text('Select an image from your device'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final XFile? pickedImage = await picker.pickImage(
+                  source: ImageSource.gallery,
+                  maxWidth: 512,
+                  maxHeight: 512,
+                  imageQuality: 80,
+                );
+                if (mounted) {
+                  navigator.pop(pickedImage);
+                }
+              },
+              child: const Text('Gallery'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final XFile? pickedImage = await picker.pickImage(
+                  source: ImageSource.camera,
+                  maxWidth: 512,
+                  maxHeight: 512,
+                  imageQuality: 80,
+                );
+                if (mounted) {
+                  navigator.pop(pickedImage);
+                }
+              },
+              child: const Text('Camera'),
+            ),
+          ],
+        ),
+      );
+      
+      if (image != null) {
+        await _uploadAvatar(File(image.path));
+      }
+    } catch (e) {
+      if (mounted) {
+        final messenger = ScaffoldMessenger.of(context);
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('Error picking image: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Handle avatar upload
+  Future<void> _uploadAvatar(File imageFile) async {
+    try {
+      setState(() => _isLoading = true);
+      
+      // Upload to Firebase Storage
+      final downloadUrl = await ImageUploader.uploadImage(
+        imageFile,
+        pathPrefix: 'avatars',
+      );
+      
+      // Save URL to Firestore
+      final uid = FirebaseAuth.instance.currentUser!.uid;
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .update({'profilePicUrl': downloadUrl});
+      
+      setState(() {
+        _photoUrl = downloadUrl;
+        _isLoading = false;
+      });
+      
+      if (mounted) {
+        final messenger = ScaffoldMessenger.of(context);
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Avatar updated successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        final messenger = ScaffoldMessenger.of(context);
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('Error updating avatar: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -266,157 +461,365 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         backgroundColor: bg,
         title: const Text('Edit Profile'),
         actions: [
-          TextButton(
-            onPressed: _saveProfile,
-            child: const Text('Save', style: TextStyle(color: Colors.white)),
-          ),
+          _isLoading
+              ? const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(accent),
+                    ),
+                  ),
+                )
+              : TextButton(
+                  onPressed: _saveProfile,
+                  child: Text('Save', style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
+                ),
         ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: accent))
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              physics: const BouncingScrollPhysics(),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  children: [
-                    // (Optional) Avatar tap target kept for future photo upload
-                    CircleAvatar(
-                      radius: 50,
-                      backgroundColor: card,
-                      backgroundImage: _photoUrl != null
-                          ? NetworkImage(_photoUrl!)
-                          : const AssetImage('assets/default_avatar.png') as ImageProvider,
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Name
-                    TextFormField(
-                      controller: _usernameCtrl,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: _inputDecoration('Username'),
-                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter username' : null,
-                    ),
-                    const SizedBox(height: 12),
-
-                    // City
-                    TextFormField(
-                      controller: _cityCtrl,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: _inputDecoration('City'),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Level
-                    DropdownButtonFormField<String>(
-                      value: _level.isEmpty ? null : _level,
-                      dropdownColor: card,
-                      decoration: _inputDecoration('Level'),
-                      items: const ['Beginner', 'Intermediate', 'Advanced']
-                          .map((l) => DropdownMenuItem(
-                                value: l,
-                                child: Text(l, style: const TextStyle(color: Colors.white)),
-                              ))
-                          .toList(),
-                      onChanged: (val) => setState(() => _level = val ?? _level),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Bio
-                    TextFormField(
-                      controller: _bioCtrl,
-                      maxLines: 4,
-                      maxLength: 160,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: _inputDecoration('Bio (optional)'),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Games / MVPs
-                    TextFormField(
-                      initialValue: _games.toString(),
-                      style: const TextStyle(color: Colors.white),
-                      decoration: _inputDecoration('Games'),
-                      keyboardType: TextInputType.number,
-                      onSaved: (v) => _games = int.tryParse(v ?? '0') ?? 0,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      initialValue: _mvps.toString(),
-                      style: const TextStyle(color: Colors.white),
-                      decoration: _inputDecoration('MVPs'),
-                      keyboardType: TextInputType.number,
-                      onSaved: (v) => _mvps = int.tryParse(v ?? '0') ?? 0,
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Sports (quick viewer; you already have full editor flow separate)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Sports', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
-                        IconButton(
-                          icon: const Icon(Icons.add, color: Colors.white),
-                          onPressed: () => _openSportPicker(),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    _sports.isEmpty
-                        ? const Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text('No sports added yet', style: TextStyle(color: Colors.grey)))
-                        : SizedBox(
-                            height: 120,
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: _sports.length,
-                              separatorBuilder: (_, __) => const SizedBox(width: 10),
-                              itemBuilder: (ctx, i) {
-                                final sport = _sports.keys.elementAt(i);
-                                final pos = _sports[sport]!;
-                                return Container(
-                                  width: 110,
-                                  decoration: BoxDecoration(color: card, borderRadius: BorderRadius.circular(16)),
-                                  padding: const EdgeInsets.all(12),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Image.asset(iconFor(sport), width: 34, height: 34),
-                                      const SizedBox(height: 8),
-                                      Text(sport,
-                                          style: const TextStyle(color: Colors.white, fontSize: 14),
-                                          overflow: TextOverflow.ellipsis),
-                                      Text(pos,
-                                          style: const TextStyle(color: Colors.grey, fontSize: 12),
-                                          overflow: TextOverflow.ellipsis),
-                                      const SizedBox(height: 6),
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          IconButton(
-                                            icon: const Icon(Icons.edit, color: Colors.white, size: 18),
-                                            padding: EdgeInsets.zero,
-                                            constraints: const BoxConstraints(),
-                                            onPressed: () => _openSportPicker(editingSport: sport),
-                                          ),
-                                          const SizedBox(width: 6),
-                                          IconButton(
-                                            icon: const Icon(Icons.delete, color: Colors.redAccent, size: 18),
-                                            padding: EdgeInsets.zero,
-                                            constraints: const BoxConstraints(),
-                                            onPressed: () => _deleteSport(sport),
-                                          ),
-                                        ],
+          : SafeArea(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(
+                  ResponsiveUtils.isSmallScreen(context) ? 12 : 16, 
+                  16, 
+                  ResponsiveUtils.isSmallScreen(context) ? 12 : 16, 
+                  16 + MediaQuery.of(context).viewInsets.bottom
+                ),
+                physics: const BouncingScrollPhysics(),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    children: [
+                      // Avatar section
+                      Center(
+                        child: Column(
+                          children: [
+                            Stack(
+                              children: [
+                                CircleAvatar(
+                                  radius: ResponsiveUtils.getResponsiveAvatarRadius(context),
+                                  backgroundColor: card,
+                                  backgroundImage: _photoUrl != null
+                                      ? NetworkImage(_photoUrl!)
+                                      : const AssetImage('assets/default_avatar.png') as ImageProvider,
+                                ),
+                                Positioned(
+                                  bottom: 0,
+                                  right: 0,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: accent,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: bg, width: 2),
+                                    ),
+                                    child: IconButton(
+                                      icon: const Icon(Icons.camera_alt),
+                                      onPressed: _showImagePicker,
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(
+                                        minWidth: 32,
+                                        minHeight: 32,
                                       ),
-                                    ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            TextButton.icon(
+                              onPressed: _showImagePicker,
+                              icon: const Icon(Icons.photo_library, size: 16),
+                              label: const Text('Choose Avatar'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: accent,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context)),
+
+                      // Name
+                      TextFormField(
+                        controller: _usernameCtrl,
+                        style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                        decoration: _inputDecoration('Username'),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Username is required';
+                          }
+                          if (value.trim().length < 3) {
+                            return 'Username must be at least 3 characters';
+                          }
+                          if (value.trim().length > 20) {
+                            return 'Username must be less than 20 characters';
+                          }
+                          if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(value.trim())) {
+                            return 'Username can only contain letters, numbers, and underscores';
+                          }
+                          return null;
+                        },
+                      ),
+                      SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context)),
+
+                      // City
+                      TextFormField(
+                        controller: _cityCtrl,
+                        style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                        decoration: _inputDecoration('City'),
+                        validator: (value) {
+                          if (value != null && value.trim().length > 50) {
+                            return 'City name must be less than 50 characters';
+                          }
+                          return null;
+                        },
+                      ),
+                      SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context)),
+
+                      // Level
+                      DropdownButtonFormField<String>(
+                        value: _level.isEmpty ? null : _level,
+                        dropdownColor: card,
+                        decoration: _inputDecoration('Level'),
+                        items: const ['Beginner', 'Intermediate', 'Advanced']
+                            .map((l) => DropdownMenuItem(
+                                  value: l,
+                                  child: Text(l, style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
+                                ))
+                            .toList(),
+                        onChanged: (val) => setState(() => _level = val ?? _level),
+                      ),
+                      SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context)),
+
+                      // Bio
+                      TextFormField(
+                        controller: _bioCtrl,
+                        maxLines: 4,
+                        maxLength: 160,
+                        style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                        decoration: _inputDecoration('Bio (optional)'),
+                        validator: (value) {
+                          if (value != null && value.trim().length > 160) {
+                            return 'Bio must be less than 160 characters';
+                          }
+                          return null;
+                        },
+                      ),
+                      SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context)),
+
+                      // Games / MVPs
+                      TextFormField(
+                        initialValue: _games.toString(),
+                        style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                        decoration: _inputDecoration('Games'),
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          final games = int.tryParse(value ?? '0');
+                          if (games == null || games < 0) {
+                            return 'Please enter a valid number (0 or higher)';
+                          }
+                          if (games > 9999) {
+                            return 'Games count seems too high';
+                          }
+                          return null;
+                        },
+                        onSaved: (v) => _games = int.tryParse(v ?? '0') ?? 0,
+                      ),
+                      SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context)),
+                      TextFormField(
+                        initialValue: _mvps.toString(),
+                        style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                        decoration: _inputDecoration('MVPs'),
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          final mvps = int.tryParse(value ?? '0');
+                          if (mvps == null || mvps < 0) {
+                            return 'Please enter a valid number (0 or higher)';
+                          }
+                          if (mvps > _games) {
+                            return 'MVPs cannot exceed total games';
+                          }
+                          return null;
+                        },
+                        onSaved: (v) => _mvps = int.tryParse(v ?? '0') ?? 0,
+                      ),
+                      SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context) * 2),
+                      
+                      // Avatar upload section
+                      SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context)),
+
+                      // Sports section
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Sports', 
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface, 
+                              fontSize: ResponsiveUtils.getResponsiveFontSize(context, small: 14, medium: 16), 
+                              fontWeight: FontWeight.w600
+                            )
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.add),
+                            onPressed: () => _openSportPicker(),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      
+                      // Sports display
+                      _sports.isEmpty
+                          ? Container(
+                              width: double.infinity,
+                              padding: ResponsiveUtils.getResponsivePadding(context),
+                              decoration: BoxDecoration(
+                                color: card.withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
+                              ),
+                              child: Column(
+                                children: [
+                                  Icon(
+                                    Icons.sports_basketball,
+                                    size: ResponsiveUtils.getResponsiveIconSize(context, small: 40, medium: 48),
+                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+                                  ),
+                                  SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context)),
+                                  Text(
+                                    'No sports added yet',
+                                    style: TextStyle(
+                                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                                      fontSize: ResponsiveUtils.getResponsiveFontSize(context, small: 14, medium: 16),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context) * 0.75),
+                                  Text(
+                                    'Add your favorite sports and positions to help teams find you!',
+                                    style: TextStyle(
+                                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                                      fontSize: ResponsiveUtils.getResponsiveFontSize(context, small: 12, medium: 14),
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context) * 1.5),
+                                  ElevatedButton.icon(
+                                    onPressed: () => _openSportPicker(),
+                                    icon: const Icon(Icons.add, size: 18),
+                                    label: const Text('Add Sport'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: accent,
+                                      foregroundColor: Theme.of(context).colorScheme.onSurface,
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : LayoutBuilder(
+                              builder: (context, constraints) {
+                                return SizedBox(
+                                  height: 160, // Fixed height that's large enough for all content
+                                  child: ListView.separated(
+                                    scrollDirection: Axis.horizontal,
+                                    itemCount: _sports.length,
+                                    separatorBuilder: (_, __) => const SizedBox(width: 10),
+                                    itemBuilder: (ctx, i) {
+                                      final sport = _sports.keys.elementAt(i);
+                                      final pos = _sports[sport]!;
+                                      return Container(
+                                        width: 140, // Fixed width that's large enough for all content
+                                        decoration: BoxDecoration(
+                                          color: card, 
+                                          borderRadius: BorderRadius.circular(16)
+                                        ),
+                                        padding: const EdgeInsets.all(16),
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            // Sport icon
+                                            Image.asset(
+                                              iconFor(sport), 
+                                              width: 36, 
+                                              height: 36,
+                                              fit: BoxFit.contain,
+                                            ),
+                                            const SizedBox(height: 8),
+                                            
+                                            // Sport name
+                                            Text(
+                                              sport,
+                                              style: TextStyle(
+                                                color: Theme.of(context).colorScheme.onSurface, 
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                              textAlign: TextAlign.center,
+                                              overflow: TextOverflow.ellipsis,
+                                              maxLines: 1,
+                                            ),
+                                            
+                                            // Position
+                                            Text(
+                                              pos,
+                                              style: const TextStyle(
+                                                color: Colors.grey, 
+                                                fontSize: 12,
+                                              ),
+                                              textAlign: TextAlign.center,
+                                              overflow: TextOverflow.ellipsis,
+                                              maxLines: 1,
+                                            ),
+                                            
+                                            const Spacer(),
+                                            
+                                            // Action buttons
+                                            Row(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                IconButton(
+                                                  icon: const Icon(Icons.edit),
+                                                  padding: EdgeInsets.zero,
+                                                  constraints: const BoxConstraints(
+                                                    minWidth: 28,
+                                                    minHeight: 28,
+                                                  ),
+                                                  onPressed: () => _openSportPicker(editingSport: sport),
+                                                ),
+                                                const SizedBox(width: 6),
+                                                IconButton(
+                                                  icon: const Icon(
+                                                    Icons.delete, 
+                                                    color: Colors.redAccent, 
+                                                    size: 18
+                                                  ),
+                                                  padding: EdgeInsets.zero,
+                                                  constraints: const BoxConstraints(
+                                                    minWidth: 28,
+                                                    minHeight: 28,
+                                                  ),
+                                                  onPressed: () => _deleteSport(sport),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    },
                                   ),
                                 );
                               },
                             ),
-                          ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -427,9 +830,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         labelText: label,
         labelStyle: const TextStyle(color: subtle),
         filled: true,
-        fillColor: Colors.white.withValues(alpha: 0.06),
+        fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.06),
         enabledBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
+          borderSide: BorderSide(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.15)),
           borderRadius: BorderRadius.circular(12),
         ),
         focusedBorder: const OutlineInputBorder(
