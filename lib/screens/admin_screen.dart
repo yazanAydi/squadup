@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/service_locator.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../core/theme/app_colors.dart';
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
@@ -178,7 +179,7 @@ class AdminScreenState extends State<AdminScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Admin Panel'),
-        backgroundColor: Colors.red[700],
+        backgroundColor: AppColors.red,
         actions: [
           IconButton(
             icon: Icon(Icons.refresh),
@@ -193,7 +194,7 @@ class AdminScreenState extends State<AdminScreen> {
           children: [
             // Access Status
             Card(
-              color: _canAccess ? Colors.green[50] : Colors.red[50],
+              color: _canAccess ? AppColors.green.withValues(alpha: 0.1) : AppColors.red.withValues(alpha: 0.1),
               child: Padding(
                 padding: EdgeInsets.all(16),
                 child: Column(
@@ -203,13 +204,13 @@ class AdminScreenState extends State<AdminScreen> {
                       children: [
                         Icon(
                           _canAccess ? Icons.check_circle : Icons.cancel,
-                          color: _canAccess ? Colors.green : Colors.red,
+                          color: _canAccess ? AppColors.green : AppColors.red,
                         ),
                         SizedBox(width: 8),
                         Text(
                           _canAccess ? 'Admin Access Granted' : 'Admin Access Denied',
                           style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: _canAccess ? Colors.green[800] : Colors.red[800],
+                            color: _canAccess ? AppColors.green : AppColors.red,
                           ),
                         ),
                       ],
@@ -220,7 +221,7 @@ class AdminScreenState extends State<AdminScreen> {
                       SizedBox(height: 8),
                       Text(
                         'To get admin access:\n1. Add your user ID to admin list\n2. Add your IP to whitelist',
-                        style: TextStyle(color: Colors.red[700]),
+                        style: TextStyle(color: AppColors.red),
                       ),
                       SizedBox(height: 16),
                       ElevatedButton.icon(
@@ -228,7 +229,7 @@ class AdminScreenState extends State<AdminScreen> {
                         label: Text('Debug Info'),
                         onPressed: _showDebugInfo,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue[700],
+                          backgroundColor: AppColors.primary,
                           foregroundColor: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
@@ -317,7 +318,7 @@ class AdminScreenState extends State<AdminScreen> {
                         label: Text('Run Data Cleanup'),
                         onPressed: _runDataCleanup,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange[700],
+                          backgroundColor: AppColors.orange,
                           foregroundColor: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
@@ -326,7 +327,7 @@ class AdminScreenState extends State<AdminScreen> {
                         'This will clean up expired invitations, old games, and rate limit data',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey[600],
+                          color: AppColors.outline,
                         ),
                       ),
                     ],

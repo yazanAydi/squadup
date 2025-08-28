@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../services/interfaces/game_service_interface.dart';
 import '../services/service_locator.dart';
 import '../utils/safe_text.dart';
+import '../core/theme/app_colors.dart';
 
 class GameFinderScreen extends StatefulWidget {
   const GameFinderScreen({super.key});
@@ -99,13 +100,13 @@ class _GameFinderScreenState extends State<GameFinderScreen>
   Color _getGameTypeColor(String type) {
     switch (type.toLowerCase()) {
       case 'pickup':
-        return Colors.green;
+        return AppColors.green;
       case 'scheduled':
-        return Colors.blue;
+        return AppColors.primary;
       case 'tournament':
-        return Colors.orange;
+        return AppColors.orange;
       default:
-        return Colors.grey;
+        return AppColors.outline;
     }
   }
 
@@ -133,7 +134,7 @@ class _GameFinderScreenState extends State<GameFinderScreen>
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey[600],
+                    color: AppColors.outline.withValues(alpha: 0.6),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -344,7 +345,7 @@ class _GameFinderScreenState extends State<GameFinderScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error loading games: ${e.toString()}'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.red,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
@@ -411,7 +412,7 @@ class _GameFinderScreenState extends State<GameFinderScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Please login to join games'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.red,
           ),
         );
         return;
@@ -422,7 +423,7 @@ class _GameFinderScreenState extends State<GameFinderScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('You are already in this game'),
-            backgroundColor: Colors.orange,
+            backgroundColor: AppColors.orange,
           ),
         );
         return;
@@ -435,7 +436,7 @@ class _GameFinderScreenState extends State<GameFinderScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Game is full'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.red,
           ),
         );
         return;
@@ -457,7 +458,7 @@ class _GameFinderScreenState extends State<GameFinderScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Successfully joined ${game['name']}!'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.green,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
@@ -471,7 +472,7 @@ class _GameFinderScreenState extends State<GameFinderScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error joining game: ${e.toString()}'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.red,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
@@ -550,7 +551,7 @@ class _GameFinderScreenState extends State<GameFinderScreen>
                           border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.2),
+                              color: AppColors.outline.withValues(alpha: 0.2),
                               blurRadius: 8,
                               offset: const Offset(0, 4),
                             ),
@@ -738,7 +739,7 @@ class _GameFinderScreenState extends State<GameFinderScreen>
         border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
+            color: AppColors.outline.withValues(alpha: 0.2),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),

@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "414224011433-rnd0ff2pvc4lmojv97i90pncni183nio.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.squadup",
+            "certificate_hash": "9b5f7138d2bb3f05083ba6a8b537345c3d3f983d"
+          }
+        },
+        {
           "client_id": "414224011433-at6kmdc568q2l8t2kfd5raiprbdk8aoe.apps.googleusercontent.com",
           "client_type": 3
         }

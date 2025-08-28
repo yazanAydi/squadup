@@ -1,41 +1,34 @@
-# PowerShell script to fix all Color.withValues(alpha:) issues
-# Run this in your project root directory
+# PowerShell script to fix all Color.withValues(alpha:) warnings
+# This replaces the deprecated method with the correct Color.withOpacity() method
 
-Write-Host "🔧 Fixing Color.withValues(alpha:) issues across all Dart files..." -ForegroundColor Yellow
+Write-Host "🔧 Fixing Color.withValues warnings in SquadUp..." -ForegroundColor Green
 
 # Get all Dart files
-$dartFiles = Get-ChildItem -Recurse -Filter "*.dart"
+$dartFiles = Get-ChildItem -Path "lib" -Recurse -Filter "*.dart" | Where-Object { $_.FullName -notlike "*test*" }
 
-$totalFiles = $dartFiles.Count
-$fixedFiles = 0
-$totalReplacements = 0
+$totalFixed = 0
 
 foreach ($file in $dartFiles) {
     $content = Get-Content $file.FullName -Raw
     $originalContent = $content
     
-    # Replace all instances of .withValues(alpha: X) with .withOpacity(X)
-    $content = $content -replace '\.withValues\(alpha:\s*([^)]+)\)', '.withOpacity($1)'
+    # Fix Color.withValues(alpha: X) -> Color.withOpacity(X)
+    $content = $content -replace 'Color\.withValues\(alpha:\s*([^)]+)\)', 'Color.withOpacity($1)'
+    $content = $content -replace 'color\.withValues\(alpha:\s*([^)]+)\)', 'color.withOpacity($1)'
+    $content = $content -replace '([a-zA-Z_][a-zA-Z0-9_]*)\.withValues\(alpha:\s*([^)]+)\)', '$1.withOpacity($2)'
     
-    # Count replacements
-    $replacements = ([regex]::Matches($originalContent, '\.withValues\(alpha:\s*[^)]+\)')).Count
-    
-    if ($replacements -gt 0) {
-        Set-Content $file.FullName $content
-        $fixedFiles++
-        $totalReplacements += $replacements
-        Write-Host "✅ Fixed $file.Name ($replacements replacements)" -ForegroundColor Green
+    # Check if any changes were made
+    if ($content -ne $originalContent) {
+        Set-Content -Path $file.FullName -Value $content -NoNewline
+        $changes = ([regex]::Matches($originalContent, '\.withValues\(alpha:\s*[^)]+\)')).Count
+        $totalFixed += $changes
+        Write-Host "✅ Fixed $changes warnings in $($file.Name)" -ForegroundColor Yellow
     }
 }
 
-Write-Host "`n🎉 Color fixes completed!" -ForegroundColor Green
-Write-Host "📁 Files processed: $totalFiles" -ForegroundColor Cyan
-Write-Host "🔧 Files fixed: $fixedFiles" -ForegroundColor Cyan
-Write-Host "🔄 Total replacements: $totalReplacements" -ForegroundColor Cyan
-
-if ($fixedFiles -gt 0) {
-    Write-Host "`n⚠️  IMPORTANT: After running this script:" -ForegroundColor Yellow
-    Write-Host "   1. Run 'flutter clean'" -ForegroundColor White
-    Write-Host "   2. Run 'flutter pub get'" -ForegroundColor White
-    Write-Host "   3. Test your app to ensure all colors work correctly" -ForegroundColor White
-}
+Write-Host ""
+Write-Host "🎉 Color warnings fix complete!" -ForegroundColor Green
+Write-Host "Total warnings fixed: $totalFixed" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "The deprecated Color.withValues(alpha:) method has been replaced with Color.withOpacity()" -ForegroundColor White
+Write-Host "Your code should now compile without these warnings!" -ForegroundColor White

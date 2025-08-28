@@ -5,6 +5,7 @@ import '../services/service_locator.dart';
 import '../utils/page_transitions.dart';
 import 'game_creation_screen.dart';
 import 'game_finder_screen.dart';
+import '../core/theme/app_colors.dart';
 
 class MyGamesScreen extends StatefulWidget {
   const MyGamesScreen({super.key});
@@ -113,7 +114,7 @@ class _MyGamesScreenState extends State<MyGamesScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error loading games: ${e.toString()}'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.red,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
@@ -127,22 +128,27 @@ class _MyGamesScreenState extends State<MyGamesScreen>
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Theme.of(context).colorScheme.surface,
-        title: const Text(
+        title: Text(
           'Cancel Game',
-          style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold),
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            color: AppColors.orange,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         content: Text(
           'Are you sure you want to cancel this game? This action cannot be undone.',
-          style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+          style: Theme.of(context).textTheme.bodyMedium,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('No', style: TextStyle(color: Theme.of(context).colorScheme.secondary)),
+            child: Text('No', style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.secondary,
+            )),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.orange),
             child: const Text('Yes, Cancel'),
           ),
         ],
@@ -160,7 +166,7 @@ class _MyGamesScreenState extends State<MyGamesScreen>
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: const Text('Game cancelled successfully'),
-              backgroundColor: Colors.orange,
+              backgroundColor: AppColors.orange,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
@@ -169,12 +175,12 @@ class _MyGamesScreenState extends State<MyGamesScreen>
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error cancelling game: ${e.toString()}'),
-              backgroundColor: Colors.red,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
+                      SnackBar(
+            content: Text('Error cancelling game: ${e.toString()}'),
+            backgroundColor: AppColors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
           );
         }
       }
@@ -186,22 +192,27 @@ class _MyGamesScreenState extends State<MyGamesScreen>
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Theme.of(context).colorScheme.surface,
-        title: const Text(
+        title: Text(
           'Leave Game',
-          style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            color: AppColors.red,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         content: Text(
           'Are you sure you want to leave this game?',
-          style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+          style: Theme.of(context).textTheme.bodyMedium,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('No', style: TextStyle(color: Theme.of(context).colorScheme.secondary)),
+            child: Text('No', style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.secondary,
+            )),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.red),
             child: const Text('Yes, Leave'),
           ),
         ],
@@ -222,7 +233,7 @@ class _MyGamesScreenState extends State<MyGamesScreen>
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: const Text('Left game successfully'),
-              backgroundColor: Colors.green,
+              backgroundColor: AppColors.green,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
@@ -233,7 +244,7 @@ class _MyGamesScreenState extends State<MyGamesScreen>
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Error leaving game: ${e.toString()}'),
-              backgroundColor: Colors.red,
+              backgroundColor: AppColors.red,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
@@ -267,15 +278,15 @@ class _MyGamesScreenState extends State<MyGamesScreen>
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'open':
-        return Colors.green;
+        return AppColors.green;
       case 'full':
-        return Colors.orange;
+        return AppColors.orange;
       case 'cancelled':
-        return Colors.red;
+        return AppColors.red;
       case 'completed':
-        return Colors.blue;
+        return AppColors.primary;
       default:
-        return Colors.grey;
+        return Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6);
     }
   }
 
@@ -295,7 +306,7 @@ class _MyGamesScreenState extends State<MyGamesScreen>
         border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
+            color: AppColors.outline.withValues(alpha: 0.2),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -336,9 +347,7 @@ class _MyGamesScreenState extends State<MyGamesScreen>
                     children: [
                       Text(
                         game['name'],
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface,
-                          fontSize: 20,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -346,9 +355,8 @@ class _MyGamesScreenState extends State<MyGamesScreen>
                         children: [
                           Text(
                             game['sport'],
-                            style: TextStyle(
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                              fontSize: 16,
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -360,9 +368,7 @@ class _MyGamesScreenState extends State<MyGamesScreen>
                             ),
                             child: Text(
                               game['status'].toUpperCase(),
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.onSurface,
-                                fontSize: 10,
+                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -388,9 +394,8 @@ class _MyGamesScreenState extends State<MyGamesScreen>
                 const SizedBox(width: 8),
                 Text(
                   game['location'],
-                  style: TextStyle(
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
-                    fontSize: 14,
                   ),
                 ),
                 const SizedBox(width: 24),
@@ -402,9 +407,8 @@ class _MyGamesScreenState extends State<MyGamesScreen>
                 const SizedBox(width: 8),
                 Text(
                   _formatDateTime(game['gameDateTime']),
-                  style: TextStyle(
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
-                    fontSize: 14,
                   ),
                 ),
               ],
@@ -422,9 +426,8 @@ class _MyGamesScreenState extends State<MyGamesScreen>
                 const SizedBox(width: 8),
                 Text(
                   '${game['currentPlayers']}/${game['maxPlayers']} players',
-                  style: TextStyle(
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
-                    fontSize: 14,
                   ),
                 ),
                 const SizedBox(width: 24),
@@ -436,9 +439,8 @@ class _MyGamesScreenState extends State<MyGamesScreen>
                 const SizedBox(width: 8),
                 Text(
                   game['gameType'],
-                  style: TextStyle(
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
-                    fontSize: 14,
                   ),
                 ),
               ],
@@ -451,14 +453,13 @@ class _MyGamesScreenState extends State<MyGamesScreen>
                   Icon(
                     Icons.lock,
                     size: 16,
-                    color: Colors.orange,
+                    color: AppColors.orange,
                   ),
                   const SizedBox(width: 8),
                   Text(
                     'Private Game',
-                    style: TextStyle(
-                      color: Colors.orange,
-                      fontSize: 14,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.orange,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -473,14 +474,13 @@ class _MyGamesScreenState extends State<MyGamesScreen>
                   Icon(
                     Icons.attach_money,
                     size: 16,
-                    color: Colors.green,
+                    color: AppColors.green,
                   ),
                   const SizedBox(width: 8),
                   Text(
                     'Entry Fee: \$${game['entryFee'].toStringAsFixed(2)}',
-                    style: TextStyle(
-                      color: Colors.green,
-                      fontSize: 14,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.green,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -498,8 +498,8 @@ class _MyGamesScreenState extends State<MyGamesScreen>
                     child: OutlinedButton(
                       onPressed: () => _cancelGame(game['id']),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.orange,
-                        side: BorderSide(color: Colors.orange.withValues(alpha: 0.6)),
+                        foregroundColor: AppColors.orange,
+                        side: BorderSide(color: AppColors.orange.withValues(alpha: 0.6)),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -516,8 +516,8 @@ class _MyGamesScreenState extends State<MyGamesScreen>
                     child: OutlinedButton(
                       onPressed: () => _leaveGame(game['id']),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.red,
-                        side: BorderSide(color: Colors.red.withValues(alpha: 0.6)),
+                        foregroundColor: AppColors.red,
+                        side: BorderSide(color: AppColors.red.withValues(alpha: 0.6)),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -540,7 +540,7 @@ class _MyGamesScreenState extends State<MyGamesScreen>
                       child: Text(
                         game['status'] == 'cancelled' ? 'Game Cancelled' : 'Game Completed',
                         textAlign: TextAlign.center,
-                        style: TextStyle(
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: _getStatusColor(game['status']),
                           fontWeight: FontWeight.bold,
                         ),
@@ -582,9 +582,7 @@ class _MyGamesScreenState extends State<MyGamesScreen>
                     Expanded(
                       child: Text(
                         'My Games',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface,
-                          fontSize: 24,
+                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                         textAlign: TextAlign.center,
@@ -613,9 +611,7 @@ class _MyGamesScreenState extends State<MyGamesScreen>
                   ],
                 ),
               ),
-
               const SizedBox(height: 20),
-
               // Content
               Expanded(
                 child: _isLoading
@@ -657,9 +653,8 @@ class _MyGamesScreenState extends State<MyGamesScreen>
             const SizedBox(height: 4),
             Text(
               label,
-              style: TextStyle(
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
                 color: isSelected ? Theme.of(context).colorScheme.onSurface : Theme.of(context).colorScheme.secondary,
-                fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -696,17 +691,15 @@ class _MyGamesScreenState extends State<MyGamesScreen>
                   const SizedBox(height: 16),
                   Text(
                     'No games created yet',
-                    style: TextStyle(
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                      fontSize: 18,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Create your first game to get started',
-                    style: TextStyle(
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-                      fontSize: 14,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -752,17 +745,15 @@ class _MyGamesScreenState extends State<MyGamesScreen>
                   const SizedBox(height: 16),
                   Text(
                     'No games joined yet',
-                    style: TextStyle(
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                      fontSize: 18,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Join games from the game finder',
-                    style: TextStyle(
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-                      fontSize: 14,
                     ),
                     textAlign: TextAlign.center,
                   ),

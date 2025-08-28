@@ -11,35 +11,48 @@
 
 import 'package:flutter/widgets.dart';
 
+class $AssetsIconsGen {
+  const $AssetsIconsGen();
+
+  /// File path: assets/icons/ball.png
+  AssetGenImage get ball => const AssetGenImage('assets/icons/ball.png');
+
+  /// File path: assets/icons/basketball.png
+  AssetGenImage get basketball =>
+      const AssetGenImage('assets/icons/basketball.png');
+
+  /// File path: assets/icons/volleyball.png
+  AssetGenImage get volleyball =>
+      const AssetGenImage('assets/icons/volleyball.png');
+
+  /// List of all assets
+  List<AssetGenImage> get values => [ball, basketball, volleyball];
+}
+
+class $AssetsImagesGen {
+  const $AssetsImagesGen();
+
+  /// File path: assets/images/logoo.png
+  AssetGenImage get logoo => const AssetGenImage('assets/images/logoo.png');
+
+  /// List of all assets
+  List<AssetGenImage> get values => [logoo];
+}
+
 class Assets {
   const Assets._();
 
-  static const AssetGenImage ball = AssetGenImage('assets/ball.png');
-  static const AssetGenImage basketball = AssetGenImage(
-    'assets/basketball.png',
-  );
   static const AssetGenImage defaultAvatar = AssetGenImage(
     'assets/default_avatar.png',
   );
   static const AssetGenImage googleLogo = AssetGenImage(
     'assets/google_logo.png',
   );
-  static const AssetGenImage logoo = AssetGenImage('assets/logoo.png');
-  static const AssetGenImage mainLogo = AssetGenImage('assets/mainLogo.jpg');
-  static const AssetGenImage volleyball = AssetGenImage(
-    'assets/volleyball.png',
-  );
+  static const $AssetsIconsGen icons = $AssetsIconsGen();
+  static const $AssetsImagesGen images = $AssetsImagesGen();
 
   /// List of all assets
-  static List<AssetGenImage> get values => [
-    ball,
-    basketball,
-    defaultAvatar,
-    googleLogo,
-    logoo,
-    mainLogo,
-    volleyball,
-  ];
+  static List<AssetGenImage> get values => [defaultAvatar, googleLogo];
 }
 
 class AssetGenImage {

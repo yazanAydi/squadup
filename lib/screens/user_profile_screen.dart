@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../services/interfaces/user_service_interface.dart';
 import '../services/service_locator.dart';
 import 'edit_profile_screen.dart';
 import 'package:flutter/foundation.dart'; // Added for kDebugMode
 import '../utils/safe_text.dart';
+import '../core/theme/app_colors.dart';
+import 'security_testing_screen.dart';
+import 'auth_screen.dart';
 
 class UserProfileScreen extends StatefulWidget {
   const UserProfileScreen({super.key});
@@ -124,11 +128,11 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   Color _levelColor(String level) {
     switch (level.toLowerCase()) {
       case 'beginner':
-        return const Color(0xFF30D158);
+        return AppColors.green;
       case 'intermediate':
-        return const Color(0xFFFFD60A);
+        return AppColors.yellow;
       case 'advanced':
-        return const Color(0xFFFF375F);
+        return AppColors.red;
       default:
         return Theme.of(context).colorScheme.secondary;
     }
@@ -141,6 +145,71 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       minScaleFactor: 1.0,
       maxScaleFactor: 1.2,
     );
+    
+    // Check if user is authenticated
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      return MediaQuery(
+        data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+        child: Scaffold(
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          appBar: AppBar(
+            title: const Text('Profile'),
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+          ),
+          body: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Theme.of(context).colorScheme.surface, Theme.of(context).colorScheme.surface],
+              ),
+            ),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.lock_outline,
+                    size: 64,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                  ),
+                  const SizedBox(height: 16),
+                  SafeTitleText(
+                    'Authentication Required',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                      fontSize: 18,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SafeBodyText(
+                    'Please sign in to view your profile',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AuthScreen(),
+                        ),
+                      );
+                    },
+                    child: const Text('Sign In'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     
     return MediaQuery(
       data: MediaQuery.of(context).copyWith(textScaler: textScaler),
@@ -168,17 +237,40 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
-                      Icons.error_outline,
+                      Icons.person_add,
                       size: 64,
                       color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                     const SizedBox(height: 16),
                     SafeTitleText(
-                      'No data found',
+                      'Profile Not Set Up',
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                         fontSize: 18,
                       ),
+                    ),
+                    const SizedBox(height: 8),
+                    SafeBodyText(
+                      'Complete your profile to get started',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: () async {
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const EditProfileScreen(),
+                          ),
+                        );
+                        if (result == true) {
+                          setState(() {}); // Refresh the profile
+                        }
+                      },
+                      child: const Text('Complete Profile'),
                     ),
                   ],
                 ),
@@ -437,7 +529,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                               border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.3),
+                                  color: AppColors.outline.withValues(alpha: 0.3),
                                   blurRadius: 12,
                                   offset: const Offset(0, 6),
                                 ),
@@ -454,7 +546,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                                   color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
                                 ),
                                 Expanded(
-                                                                     child: _statCard('MVPs', mvps.toString(), Icons.star, Colors.amber),
+                                                                     child: _statCard('MVPs', mvps.toString(), Icons.star, AppColors.yellow),
                                 ),
                               ],
                             ),
@@ -571,6 +663,98 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                           ),
                           const SizedBox(height: 40),
                         ],
+
+                        // Security Testing Section
+                        SlideTransition(
+                          position: _slideAnimation,
+                          child: FadeTransition(
+                            opacity: _fadeAnimation,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.orange.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Icon(
+                                        Icons.security,
+                                        color: Colors.orange,
+                                        size: 20,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    SafeTitleText(
+                                      'Security & Testing',
+                                      style: TextStyle(
+                                        color: Theme.of(context).colorScheme.onSurface,
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(20),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        Colors.orange.withValues(alpha: 0.05),
+                                        Colors.orange.withValues(alpha: 0.02),
+                                      ],
+                                    ),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: Colors.orange.withValues(alpha: 0.2)),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      SafeBodyText(
+                                        'Test all security features to ensure they are working correctly. This includes authentication, encryption, threat detection, and more.',
+                                        style: TextStyle(
+                                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                                          height: 1.5,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: ElevatedButton.icon(
+                                          onPressed: () {
+                                            Navigator.of(context).push(
+                                              MaterialPageRoute(
+                                                builder: (context) => const SecurityTestingScreen(),
+                                              ),
+                                            );
+                                          },
+                                          icon: const Icon(Icons.security),
+                                          label: const Text('Open Security Testing'),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.orange,
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(vertical: 12),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 40),
                       ],
                     ),
                   ),
@@ -647,7 +831,7 @@ class _SportsStrip extends StatelessWidget {
           scrollDirection: Axis.horizontal,
           physics: const BouncingScrollPhysics(),
           itemCount: items.length,
-          separatorBuilder: (_, __) => const SizedBox(width: _spacing),
+          separatorBuilder: (context, index) => const SizedBox(width: _spacing),
           itemBuilder: (context, i) => SizedBox(
             width: cardWidth,
             child: _sportCard(context, items[i], tileH),
@@ -678,7 +862,7 @@ class _SportsStrip extends StatelessWidget {
         border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
+            color: AppColors.outline.withValues(alpha: 0.2),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),

@@ -60,7 +60,7 @@ class TeamProvider {
     if (_searchQuery.isNotEmpty) {
       filtered = filtered.where((team) =>
         team.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-        team.location.toLowerCase().contains(_searchQuery.toLowerCase())
+        team.city.toLowerCase().contains(_searchQuery.toLowerCase())
       ).toList();
     }
     

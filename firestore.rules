@@ -2,161 +2,253 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Helper functions for security checks
+    // Helper functions
     function isAuthenticated() {
       return request.auth != null;
     }
     
     function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+      return request.auth.uid == userId;
     }
     
-    function isCreator(creatorId) {
-      return isAuthenticated() && request.auth.uid == creatorId;
+    function isTeamMember(teamId) {
+      return request.auth.uid in resource.data.members;
     }
     
-    function isAdmin() {
-      return isAuthenticated() && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    function isTeamOwner(teamId) {
+      return request.auth.uid == resource.data.createdBy;
     }
     
-    function isValidUserData(data) {
-      return data.keys().hasAll(['username', 'email', 'createdAt']) &&
-             data.username is string && data.username.size() > 0 && data.username.size() <= 50 &&
-             !data.username.matches('.*[<>\"\'].*') && // Prevent XSS
-             data.email is string && data.email.matches('^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$') &&
-             data.createdAt is timestamp;
+    function isGameParticipant(gameId) {
+      return request.auth.uid in resource.data.players;
     }
     
-    function isValidGameData(data) {
-      return data.keys().hasAll(['name', 'sport', 'gameDateTime', 'maxPlayers', 'createdBy']) &&
-             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
-             !data.name.matches('.*[<>\"\'].*') && // Prevent XSS
-             data.sport is string && data.sport.size() > 0 && data.sport.size() <= 50 &&
-             !data.sport.matches('.*[<>\"\'].*') && // Prevent XSS
-             data.gameDateTime is timestamp &&
-             data.maxPlayers is int && data.maxPlayers > 0 && data.maxPlayers <= 100 &&
-             data.createdBy is string;
+    function isGameCreator(gameId) {
+      return request.auth.uid == resource.data.createdBy;
     }
     
-    function isValidTeamData(data) {
-      return data.keys().hasAll(['name', 'sport', 'createdBy']) &&
-             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
-             !data.name.matches('.*[<>\"\'].*') && // Prevent XSS
-             data.sport is string && data.sport.size() > 0 && data.sport.size() <= 50 &&
-             !data.sport.matches('.*[<>\"\'].*') && // Prevent XSS
-             data.createdBy is string;
+    // Enhanced input validation functions
+    function isValidEmail(email) {
+      return email is string &&
+             email.size() > 0 &&
+             email.size() <= 100 &&
+             email.matches('^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$');
     }
-
-    // Users - Users can only read/write their own profile
+    
+    function isValidUsername(username) {
+      return username is string &&
+             username.size() >= 3 &&
+             username.size() <= 50 &&
+             username.matches('^[a-zA-Z0-9_-]+$');
+    }
+    
+    function isValidDisplayName(displayName) {
+      return displayName is string &&
+             displayName.size() > 0 &&
+             displayName.size() <= 100 &&
+             !displayName.matches('.*[<>"\'].*'); // Prevent XSS
+    }
+    
+    function isValidBio(bio) {
+      return bio == null || 
+             (bio is string && 
+              bio.size() <= 500 &&
+              !bio.matches('.*[<>"\'].*')); // Prevent XSS
+    }
+    
+    function isValidCity(city) {
+      return city is string &&
+             city.size() > 0 &&
+             city.size() <= 100 &&
+             !city.matches('.*[<>"\'].*'); // Prevent XSS
+    }
+    
+    function isValidTeamName(teamName) {
+      return teamName is string &&
+             teamName.size() > 0 &&
+             teamName.size() <= 100 &&
+             !teamName.matches('.*[<>"\'].*'); // Prevent XSS
+    }
+    
+    function isValidGameTitle(title) {
+      return title is string &&
+             title.size() > 0 &&
+             title.size() <= 200 &&
+             !title.matches('.*[<>"\'].*'); // Prevent XSS
+    }
+    
+    function isValidDescription(description) {
+      return description == null || 
+             (description is string && 
+              description.size() <= 1000 &&
+              !description.matches('.*[<>"\'].*')); // Prevent XSS
+    }
+    
+    function isValidUserData() {
+      return request.resource.data.keys().hasAll(['displayName', 'email', 'createdAt']) &&
+             isValidEmail(request.resource.data.email) &&
+             isValidDisplayName(request.resource.data.displayName) &&
+             request.resource.data.createdAt is timestamp;
+    }
+    
+    function isValidTeamData() {
+      return request.resource.data.keys().hasAll(['name', 'sport', 'createdBy', 'createdAt']) &&
+             isValidTeamName(request.resource.data.name) &&
+             request.resource.data.sport is string &&
+             request.resource.data.sport.size() > 0 &&
+             request.resource.data.createdBy is string &&
+             request.resource.data.createdAt is timestamp;
+    }
+    
+    function isValidGameData() {
+      return request.resource.data.keys().hasAll(['name', 'sport', 'createdBy', 'createdAt']) &&
+             isValidGameTitle(request.resource.data.name) &&
+             request.resource.data.sport is string &&
+             request.resource.data.sport.size() > 0 &&
+             request.resource.data.createdBy is string &&
+             request.resource.data.createdAt is timestamp;
+    }
+    
+    // Enhanced rate limiting with proper time windows
+    function isRateLimited(operation, maxRequests, windowSeconds) {
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      let operations = userDoc.data.rateLimit[operation] || [];
+      let now = timestamp.date();
+      let windowStart = now.toMillis() - (windowSeconds * 1000);
+      
+      // Remove old operations outside the window
+      operations = operations.filter(op => op.toMillis() > windowStart);
+      
+      return operations.size() >= maxRequests;
+    }
+    
+    // Rate limiting configuration
+    function isUserCreateRateLimited() {
+      return isRateLimited('user_create', 5, 3600); // 5 per hour
+    }
+    
+    function isUserUpdateRateLimited() {
+      return isRateLimited('user_update', 20, 3600); // 20 per hour
+    }
+    
+    function isTeamCreateRateLimited() {
+      return isRateLimited('team_create', 3, 3600); // 3 per hour
+    }
+    
+    function isTeamUpdateRateLimited() {
+      return isRateLimited('team_update', 10, 3600); // 10 per hour
+    }
+    
+    function isGameCreateRateLimited() {
+      return isRateLimited('game_create', 5, 3600); // 5 per hour
+    }
+    
+    function isGameUpdateRateLimited() {
+      return isRateLimited('game_update', 15, 3600); // 15 per hour
+    }
+    
+    // Users collection
     match /users/{userId} {
-      allow read: if isOwner(userId);
-      allow create: if isOwner(userId) && isValidUserData(request.resource.data);
-      allow update: if isOwner(userId) && 
-        // Prevent manipulation of critical fields
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['uid', 'email', 'createdAt', 'role']) &&
-        // Allow updates to profile fields only
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['username', 'profilePicUrl', 'sports', 'level', 'city', 'goals', 'onboardingCompleted', 'onboardingCompletedAt', 'phone', 'location']);
-      allow delete: if isAdmin(); // Only admins can delete user documents
+      // Users can read their own profile
+      allow read: if isAuthenticated() && isOwner(userId);
+      
+      // Users can create their own profile
+      allow create: if isAuthenticated() && 
+                      isOwner(userId) && 
+                      isValidUserData() &&
+                      !isUserCreateRateLimited();
+      
+      // Users can update their own profile
+      allow update: if isAuthenticated() && 
+                      isOwner(userId) && 
+                      isValidUserData() &&
+                      !isUserUpdateRateLimited();
+      
+      // Users can delete their own profile
+      allow delete: if isAuthenticated() && 
+                      isOwner(userId) &&
+                      !isRateLimited('user_delete', 1, 86400); // 1 per day
+      
+      // Public read access for basic user info (for team/game displays)
+      allow read: if isAuthenticated() && 
+                    resource.data.keys().hasAll(['displayName', 'sports', 'city']) &&
+                    isValidDisplayName(resource.data.displayName) &&
+                    isValidCity(resource.data.city);
     }
     
-    // Teams - Users can only manage teams they created
+    // Teams collection
     match /teams/{teamId} {
-      allow read: if isAuthenticated(); // Anyone can read team info
+      // Anyone can read public team info
+      allow read: if isAuthenticated();
+      
+      // Authenticated users can create teams
       allow create: if isAuthenticated() && 
-        request.auth.uid == request.resource.data.createdBy &&
-        isValidTeamData(request.resource.data);
-      allow update: if isCreator(resource.data.createdBy) &&
-        // Prevent manipulation of critical fields
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['id', 'createdBy', 'createdAt']);
-      allow delete: if isAdmin(); // Only admins can delete team documents
+                      isValidTeamData() &&
+                      isOwner(request.resource.data.createdBy) &&
+                      !isTeamCreateRateLimited();
+      
+      // Team owners can update their teams
+      allow update: if isAuthenticated() && 
+                      isTeamOwner(teamId) &&
+                      isValidTeamData() &&
+                      !isTeamUpdateRateLimited();
+      
+      // Team owners can delete their teams
+      allow delete: if isAuthenticated() && 
+                      isTeamOwner(teamId) &&
+                      !isRateLimited('team_delete', 1, 86400); // 1 per day
+      
+      // Team members can update member list (for joining/leaving)
+      allow update: if isAuthenticated() && 
+                      (isTeamOwner(teamId) || isTeamMember(teamId)) &&
+                      request.resource.data.diff(resource.data).affectedKeys()
+                        .hasOnly(['members', 'memberCount', 'lastUpdated', 'pendingRequests']) &&
+                      !isRateLimited('team_member_update', 10, 3600); // 10 per hour
     }
     
-    // Games - Users can only manage games they created
+    // Games collection
     match /games/{gameId} {
-      allow read: if isAuthenticated(); // Anyone can read game info
+      // Anyone can read public game info
+      allow read: if isAuthenticated();
+      
+      // Authenticated users can create games
       allow create: if isAuthenticated() && 
-        request.auth.uid == request.resource.data.createdBy &&
-        isValidGameData(request.resource.data);
-      allow update: if isCreator(resource.data.createdBy) &&
-        // Prevent manipulation of critical fields
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['id', 'createdBy', 'createdAt']) &&
-        // Allow specific game state updates
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['players', 'currentPlayers', 'status', 'updatedAt']);
-      allow delete: if isAdmin(); // Only admins can delete game documents
-    }
-    
-    // Team invitations - Only team creators can manage invitations
-    match /team_invitations/{invitationId} {
-      allow read: if isAuthenticated() && 
-        (request.auth.uid == resource.data.userId || 
-         request.auth.uid == resource.data.invitedBy);
-      allow create: if isAuthenticated() && 
-        request.auth.uid == request.resource.data.invitedBy &&
-        request.resource.data.keys().hasAll(['userId', 'invitedBy', 'teamId', 'status', 'createdAt']);
+                      isValidGameData() &&
+                      isOwner(request.resource.data.createdBy) &&
+                      !isGameCreateRateLimited();
+      
+      // Game creators can update their games
       allow update: if isAuthenticated() && 
-        request.auth.uid == resource.data.userId &&
-        // Only allow status updates (accept/decline)
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'respondedAt']);
-      allow delete: if isAdmin(); // Only admins can delete invitation documents
-    }
-    
-    // Game bookings - Users can only manage their own bookings
-    match /bookings/{bookingId} {
-      allow read: if isAuthenticated() && 
-        (request.auth.uid == resource.data.userId || 
-         request.auth.uid == resource.data.fieldOwnerId);
-      allow create: if isAuthenticated() && 
-        request.auth.uid == request.resource.data.userId &&
-        request.resource.data.keys().hasAll(['userId', 'fieldId', 'gameId', 'date', 'status', 'createdAt']);
+                      isGameCreator(gameId) &&
+                      isValidGameData() &&
+                      !isGameUpdateRateLimited();
+      
+      // Game creators can delete their games
+      allow delete: if isAuthenticated() && 
+                      isGameCreator(gameId) &&
+                      !isRateLimited('game_delete', 1, 86400); // 1 per day
+      
+      // Participants can update participant list (for joining/leaving)
       allow update: if isAuthenticated() && 
-        request.auth.uid == resource.data.userId &&
-        // Only allow status updates
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
-      allow delete: if isAdmin(); // Only admins can delete booking documents
+                      (isGameCreator(gameId) || isGameParticipant(gameId)) &&
+                      request.resource.data.diff(resource.data).affectedKeys()
+                        .hasOnly(['players', 'currentPlayers', 'status', 'lastUpdated', 'pendingRequests']) &&
+                      !isRateLimited('game_participant_update', 10, 3600); // 10 per hour
     }
     
-    // Fields - Field owners can manage their fields
-    match /fields/{fieldId} {
-      allow read: if isAuthenticated(); // Anyone can read field info
-      allow create: if isAuthenticated() && 
-        request.auth.uid == request.resource.data.ownerId &&
-        request.resource.data.keys().hasAll(['name', 'location', 'sports', 'ownerId', 'createdAt']);
-      allow update: if isAuthenticated() && 
-        request.auth.uid == resource.data.ownerId &&
-        // Prevent manipulation of critical fields
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['id', 'ownerId', 'createdAt']);
-      allow delete: if isAdmin(); // Only admins can delete field documents
+    // Rate limiting metadata collection
+    match /rateLimit/{userId} {
+      allow read, write: if isAuthenticated() && isOwner(userId);
     }
     
-    // Statistics - Users can only manage their own stats
-    match /statistics/{userId} {
-      allow read: if isOwner(userId);
-      allow create: if isOwner(userId) && 
-        request.resource.data.keys().hasAll(['userId', 'gamesPlayed', 'mvps', 'createdAt']);
-      allow update: if isOwner(userId) &&
-        // Only allow specific stat updates
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['gamesPlayed', 'mvps', 'updatedAt']);
-      allow delete: if isAdmin(); // Only admins can delete stat documents
-    }
-    
-    // User sessions - Users can manage their own sessions
-    match /user_sessions/{sessionId} {
+    // Admin operations (if needed)
+    match /admin/{document=**} {
       allow read, write: if isAuthenticated() && 
-        request.auth.uid == resource.data.userId;
+                           request.auth.token.admin == true &&
+                           !isRateLimited('admin_operation', 100, 3600); // 100 per hour
     }
     
-    // Rate limits - Users can manage their own rate limit data
-    match /rate_limits/{userId} {
-      allow read, write: if isOwner(userId);
-    }
-    
-    // Audit logs - Only admins can access audit logs
-    match /audit_logs/{logId} {
-      allow read, write: if isAdmin();
-    }
-    
-    // Deny all other access by default
+    // Deny all other operations
     match /{document=**} {
       allow read, write: if false;
     }

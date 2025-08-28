@@ -2,9 +2,11 @@ import 'package:flutter/foundation.dart';
 import 'interfaces/user_service_interface.dart';
 import 'interfaces/team_service_interface.dart';
 import 'interfaces/game_service_interface.dart';
+import 'interfaces/chat_service_interface.dart';
 import 'implementations/user_service.dart';
 import 'implementations/team_service.dart';
 import 'implementations/game_service.dart';
+import 'implementations/chat_service.dart';
 import '../utils/data_service.dart';
 import 'admin_service.dart';
 import 'data_cleanup_service.dart';
@@ -19,6 +21,7 @@ class ServiceLocator {
   UserServiceInterface? _userService;
   TeamServiceInterface? _teamService;
   GameServiceInterface? _gameService;
+  ChatServiceInterface? _chatService;
   DataService? _dataService;
   AdminService? _adminService;
   DataCleanupService? _dataCleanupService;
@@ -27,6 +30,7 @@ class ServiceLocator {
   UserServiceInterface get userService => _userService ??= UserService();
   TeamServiceInterface get teamService => _teamService ??= TeamService();
   GameServiceInterface get gameService => _gameService ??= GameService();
+  ChatServiceInterface get chatService => _chatService ??= ChatService();
   DataService get dataService => _dataService ??= DataService.instance;
   AdminService get adminService => _adminService ??= AdminService();
   DataCleanupService get dataCleanupService => _dataCleanupService ??= DataCleanupService();
@@ -57,6 +61,7 @@ class ServiceLocator {
     _userService = null;
     _teamService = null;
     _gameService = null;
+    _chatService = null;
     _dataService = null;
     _adminService = null;
     _dataCleanupService = null;
@@ -74,6 +79,8 @@ class ServiceLocator {
       return teamService as T;
     } else if (T == GameServiceInterface) {
       return gameService as T;
+    } else if (T == ChatServiceInterface) {
+      return chatService as T;
     } else if (T == DataService) {
       return dataService as T;
     } else if (T == AdminService) {

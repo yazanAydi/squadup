@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/di/providers.dart';
-import '../models/team.dart';
-import '../models/game.dart';
-import '../models/user_profile.dart';
 
 class ExampleControllerUsageScreen extends ConsumerWidget {
   const ExampleControllerUsageScreen({super.key});
@@ -121,8 +118,8 @@ class ExampleControllerUsageScreen extends ConsumerWidget {
                           ? Column(
                               children: teamsList.map((team) => ListTile(
                                 title: Text(team.name),
-                                subtitle: Text('${team.sport} - ${team.location}'),
-                                trailing: Text('${team.memberCount} members'),
+                                subtitle: Text('${team.sport} - ${team.city}'),
+                                trailing: Text('${team.currentMemberCount}/${team.maxMembers} members'),
                               )).toList(),
                             )
                           : const Text('No teams found'),
@@ -135,8 +132,11 @@ class ExampleControllerUsageScreen extends ConsumerWidget {
                         ref.read(teamControllerProvider.notifier).createTeam({
                           'name': 'New Team ${DateTime.now().millisecondsSinceEpoch}',
                           'sport': 'Basketball',
-                          'location': 'Local Gym',
-                          'ownerId': 'current-user-id',
+                          'city': 'Local City',
+                          'skillLevel': 'Beginner',
+                          'description': 'A sample team for testing',
+                          'maxMembers': 15,
+                          'createdBy': 'current-user-id',
                         });
                       },
                       child: const Text('Create Sample Team'),

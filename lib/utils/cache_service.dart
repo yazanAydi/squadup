@@ -11,7 +11,7 @@ class CacheService {
   Future<bool> get hasInternetConnection async {
     try {
       final connectivityResult = await Connectivity().checkConnectivity();
-      return connectivityResult != ConnectivityResult.none;
+      return connectivityResult.isNotEmpty && connectivityResult.contains(ConnectivityResult.none) == false;
     } catch (e) {
       if (kDebugMode) {
         print('Error checking connectivity: $e');
@@ -29,22 +29,17 @@ class CacheService {
   Future<String> getConnectivityStatus() async {
     try {
       final connectivityResult = await Connectivity().checkConnectivity();
-      switch (connectivityResult) {
-        case ConnectivityResult.mobile:
-          return 'Mobile';
-        case ConnectivityResult.wifi:
-          return 'WiFi';
-        case ConnectivityResult.ethernet:
-          return 'Ethernet';
-        case ConnectivityResult.vpn:
-          return 'VPN';
-        case ConnectivityResult.bluetooth:
-          return 'Bluetooth';
-        case ConnectivityResult.other:
-          return 'Other';
-        case ConnectivityResult.none:
-          return 'Offline';
-      }
+      if (connectivityResult.isEmpty) return 'Offline';
+      
+      // Check for the most common connection types first
+      if (connectivityResult.contains(ConnectivityResult.wifi)) return 'WiFi';
+      if (connectivityResult.contains(ConnectivityResult.mobile)) return 'Mobile';
+      if (connectivityResult.contains(ConnectivityResult.ethernet)) return 'Ethernet';
+      if (connectivityResult.contains(ConnectivityResult.vpn)) return 'VPN';
+      if (connectivityResult.contains(ConnectivityResult.bluetooth)) return 'Bluetooth';
+      if (connectivityResult.contains(ConnectivityResult.other)) return 'Other';
+      
+      return 'Offline';
     } catch (e) {
       if (kDebugMode) {
         print('Error getting connectivity status: $e');
@@ -54,7 +49,7 @@ class CacheService {
   }
 
   /// Monitor connectivity changes
-  Stream<ConnectivityResult> get connectivityStream {
+  Stream<List<ConnectivityResult>> get connectivityStream {
     return Connectivity().onConnectivityChanged;
   }
 }

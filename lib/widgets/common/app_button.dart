@@ -50,7 +50,7 @@ class AppButton extends StatelessWidget {
             padding: padding,
             minimumSize: Size(width ?? (isFullWidth ? double.infinity : 0), height),
           ),
-          child: _buildButtonContent(),
+          child: _buildButtonContent(context),
         );
         break;
         
@@ -68,7 +68,7 @@ class AppButton extends StatelessWidget {
             padding: padding,
             minimumSize: Size(width ?? (isFullWidth ? double.infinity : 0), height),
           ),
-          child: _buildButtonContent(),
+          child: _buildButtonContent(context),
         );
         break;
         
@@ -84,7 +84,7 @@ class AppButton extends StatelessWidget {
             padding: padding,
             minimumSize: Size(width ?? (isFullWidth ? double.infinity : 0), height),
           ),
-          child: _buildButtonContent(),
+          child: _buildButtonContent(context),
         );
         break;
         
@@ -99,7 +99,7 @@ class AppButton extends StatelessWidget {
             padding: padding,
             minimumSize: Size(width ?? (isFullWidth ? double.infinity : 0), height),
           ),
-          child: _buildButtonContent(),
+          child: _buildButtonContent(context),
         );
         break;
     }
@@ -112,7 +112,7 @@ class AppButton extends StatelessWidget {
     );
   }
 
-  Widget _buildButtonContent() {
+  Widget _buildButtonContent(BuildContext context) {
     if (isLoading) {
       return SizedBox(
         width: 20,
@@ -121,8 +121,8 @@ class AppButton extends StatelessWidget {
           strokeWidth: 2,
           valueColor: AlwaysStoppedAnimation<Color>(
             type == AppButtonType.outline || type == AppButtonType.text
-                ? Colors.grey
-                : Colors.white,
+                ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)
+                : Theme.of(context).colorScheme.onPrimary,
           ),
         ),
       );

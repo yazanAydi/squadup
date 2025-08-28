@@ -7,6 +7,7 @@ import 'team_management_screen.dart';
 import '../utils/page_transitions.dart';
 import '../services/interfaces/team_service_interface.dart';
 import '../services/service_locator.dart';
+import '../core/theme/app_colors.dart';
 
 class MyTeamsScreen extends StatefulWidget {
   const MyTeamsScreen({super.key});
@@ -123,7 +124,7 @@ class _MyTeamsScreenState extends State<MyTeamsScreen>
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey[600],
+                    color: AppColors.outline.withValues(alpha: 0.6),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -301,7 +302,7 @@ class _MyTeamsScreenState extends State<MyTeamsScreen>
   void _manageTeam(Map<String, dynamic> team) {
     Navigator.pop(context);
     Navigator.of(context).push(
-      PageTransitions.slideRight(TeamManagementScreen(team: team)),
+      PageTransitions.slideRight(const TeamManagementScreen()),
     );
   }
 
@@ -455,7 +456,7 @@ class _MyTeamsScreenState extends State<MyTeamsScreen>
         border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
+                            color: AppColors.outline.withValues(alpha: 0.2),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),

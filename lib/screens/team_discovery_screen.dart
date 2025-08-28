@@ -1,660 +1,755 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import '../utils/safe_text.dart';
-import '../utils/page_transitions.dart';
-// Removed Freepik demo imports
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/theme/app_colors.dart';
+import '../widgets/common/app_button.dart';
+import '../widgets/common/app_card.dart';
+import '../widgets/modern_input_field.dart';
+import '../services/service_locator.dart';
+import 'team_creation_screen.dart';
 
-class TeamDiscoveryScreen extends StatefulWidget {
+class TeamDiscoveryScreen extends ConsumerStatefulWidget {
   const TeamDiscoveryScreen({super.key});
 
   @override
-  TeamDiscoveryScreenState createState() => TeamDiscoveryScreenState();
+  ConsumerState<TeamDiscoveryScreen> createState() => _TeamDiscoveryScreenState();
 }
 
-class TeamDiscoveryScreenState extends State<TeamDiscoveryScreen>
-    with TickerProviderStateMixin {
-  final TextEditingController _searchControllerText = TextEditingController();
-  String _searchQuery = '';
+class _TeamDiscoveryScreenState extends ConsumerState<TeamDiscoveryScreen> {
+  final _searchController = TextEditingController();
+  
+  List<Map<String, dynamic>> _teams = [];
+  List<Map<String, dynamic>> _filteredTeams = [];
+  bool _isLoading = false;
+  
+  // Filters
   String _selectedSport = 'All';
-  final bool _isLoading = false;
-  late AnimationController _searchFadeController;
-  late Animation<double> _searchFade;
-
-  // Sports list
-  final List<String> _sports = ['All', 'Basketball', 'Football', 'Soccer', 'Tennis'];
-
-  // Colors - will be replaced with theme tokens
+  String _selectedSkillLevel = 'All';
+  String _selectedLocation = 'All';
+  bool _showOnlyRecruiting = true;
+  bool _showOnlyActive = true;
+  bool _showOnlyFree = false;
+  
+  final List<String> _availableSports = [
+    'All', 'Football', 'Basketball', 'Tennis', 'Volleyball', 'Baseball',
+    'Soccer', 'Hockey', 'Cricket', 'Rugby', 'Badminton',
+    'Table Tennis', 'Golf', 'Swimming', 'Running', 'Cycling', 'Other'
+  ];
+  
+  final List<String> _skillLevels = [
+    'All', 'Beginner', 'Intermediate', 'Advanced', 'Professional', 'All Levels'
+  ];
+  
+  final List<String> _locations = [
+    'All', 'Current Location', 'Nearby', 'City Center', 'Suburbs'
+  ];
 
   @override
   void initState() {
     super.initState();
-    _searchFadeController = AnimationController(
-      duration: const Duration(milliseconds: 300),
-      vsync: this,
-    );
-    _searchFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _searchFadeController, curve: Curves.easeInOut),
-    );
-    _searchFadeController.forward();
+    _loadTeams();
   }
 
   @override
   void dispose() {
-    _searchControllerText.dispose();
-    _searchFadeController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
-  void _showTeamDetails(Map<String, dynamic> team) {
-    // Navigate to team details screen
-    Navigator.of(context).push(
-      PageTransitions.slideRight(
-        Scaffold(
-          appBar: AppBar(
-            title: Text(team['name'] ?? 'Team Details'),
-            backgroundColor: Theme.of(context).colorScheme.surface,
-            foregroundColor: Theme.of(context).colorScheme.onSurface,
-          ),
-          backgroundColor: Theme.of(context).colorScheme.surface,
-          body: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Team Header
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Theme.of(context).colorScheme.surface,
-                        Theme.of(context).colorScheme.surface.withValues(alpha: 0.8),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
-                              Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: team['imageUrl'] != null && team['imageUrl'].toString().isNotEmpty
-                            ? ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: CachedNetworkImage(
-                                  imageUrl: team['imageUrl'],
-                                  width: 60,
-                                  height: 60,
-                                  fit: BoxFit.cover,
-                                  placeholder: (context, url) => Container(
-                                    width: 60,
-                                    height: 60,
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Center(
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Theme.of(context).colorScheme.onSurface,
-                                      ),
-                                    ),
-                                  ),
-                                  errorWidget: (context, url, error) => Image.asset(
-                                    _getSportIcon(team['sport'] ?? 'Basketball'),
-                                    width: 30,
-                                    height: 30,
-                                  ),
-                                ),
-                              )
-                            : Image.asset(
-                                _getSportIcon(team['sport'] ?? 'Basketball'),
-                                width: 30,
-                                height: 30,
-                              ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SafeTitleText(
-                              team['name'] ?? 'Team Name',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.onSurface,
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            SafeLabelText(
-                              team['sport'] ?? 'Sport',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                                fontSize: 16,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                
-                // Team Info
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Theme.of(context).colorScheme.surface,
-                        Theme.of(context).colorScheme.surface.withValues(alpha: 0.8),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SafeTitleText(
-                        'Team Information',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildInfoRow('Location', team['location'] ?? 'Unknown'),
-                      _buildInfoRow('Sport', team['sport'] ?? 'Unknown'),
-                      _buildInfoRow('Members', '${team['memberCount'] ?? 0} players'),
-                      _buildInfoRow('Created', team['createdAt'] ?? 'Unknown'),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                
-                // Join Button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      // Handle join team logic
-                      Navigator.pop(context);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Theme.of(context).colorScheme.primary,
-                      foregroundColor: Theme.of(context).colorScheme.onSurface,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const SafeTitleText(
-                      'Join Team',
-                      style: TextStyle(fontSize: 16),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  Future<void> _loadTeams() async {
+    setState(() {
+      _isLoading = true;
+    });
 
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          SafeLabelText(
-            label,
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-              fontSize: 14,
-            ),
+    try {
+      // Mock data for demonstration
+      await Future.delayed(const Duration(seconds: 1));
+      
+      final teams = [
+        {
+          'id': '1',
+          'name': 'Thunder Hawks',
+          'sport': 'Basketball',
+          'skillLevel': 'Intermediate',
+          'location': 'Downtown',
+          'memberCount': 12,
+          'maxMembers': 15,
+          'isRecruiting': true,
+          'isActive': true,
+          'description': 'Competitive basketball team looking for dedicated players',
+          'monthlyFee': 25.0,
+          'requiresTryout': true,
+        },
+        {
+          'id': '2',
+          'name': 'Soccer Legends',
+          'sport': 'Soccer',
+          'skillLevel': 'All Levels',
+          'location': 'City Park',
+          'memberCount': 18,
+          'maxMembers': 22,
+          'isRecruiting': true,
+          'isActive': true,
+          'description': 'Casual soccer team for all skill levels',
+          'monthlyFee': 0.0,
+          'requiresTryout': false,
+        },
+        {
+          'id': '3',
+          'name': 'Volleyball Stars',
+          'sport': 'Volleyball',
+          'skillLevel': 'Advanced',
+          'location': 'Sports Complex',
+          'memberCount': 8,
+          'maxMembers': 12,
+          'isRecruiting': false,
+          'isActive': true,
+          'description': 'Advanced volleyball team, full roster',
+          'monthlyFee': 30.0,
+          'requiresTryout': true,
+        },
+        {
+          'id': '4',
+          'name': 'Tennis Club',
+          'sport': 'Tennis',
+          'skillLevel': 'Beginner',
+          'location': 'Tennis Courts',
+          'memberCount': 6,
+          'maxMembers': 20,
+          'isRecruiting': true,
+          'isActive': true,
+          'description': 'Beginner-friendly tennis club',
+          'monthlyFee': 15.0,
+          'requiresTryout': false,
+        },
+      ];
+      
+      setState(() {
+        _teams = teams;
+        _filteredTeams = teams;
+      });
+      
+      _applyFilters();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load teams: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
           ),
-          SafeTitleText(
-            value,
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _getSportIcon(String sport) {
-    switch (sport.toLowerCase()) {
-      case 'basketball':
-        return 'assets/basketball.png';
-      case 'football':
-        return 'assets/ball.png';
-      case 'soccer':
-        return 'assets/ball.png';
-      case 'tennis':
-        return 'assets/ball.png';
-      default:
-        return 'assets/ball.png';
+        );
+      }
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return MediaQuery(
-      data: MediaQuery.of(context).copyWith(
-        textScaler: MediaQuery.of(context).textScaler.clamp(
-          minScaleFactor: 1.0,
-          maxScaleFactor: 1.2,
-        ),
-      ),
-      child: Scaffold(
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        body: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Theme.of(context).colorScheme.surface, Theme.of(context).colorScheme.surface],
-            ),
+  void _applyFilters() {
+    setState(() {
+      _filteredTeams = _teams.where((team) {
+        // Sport filter
+        if (_selectedSport != 'All' && team['sport'] != _selectedSport) {
+          return false;
+        }
+        
+        // Skill level filter
+        if (_selectedSkillLevel != 'All' && team['skillLevel'] != _selectedSkillLevel) {
+          return false;
+        }
+        
+        // Location filter
+        if (_selectedLocation != 'All' && team['location'] != _selectedLocation) {
+          return false;
+        }
+        
+        // Recruiting filter
+        if (_showOnlyRecruiting && !team['isRecruiting']) {
+          return false;
+        }
+        
+        // Active filter
+        if (_showOnlyActive && !team['isActive']) {
+          return false;
+        }
+
+        // Free filter
+        if (_showOnlyFree && team['monthlyFee'] > 0) {
+          return false;
+        }
+        
+        // Search query filter
+        if (_searchController.text.isNotEmpty) {
+          final query = _searchController.text.toLowerCase();
+          if (!team['name'].toLowerCase().contains(query) &&
+              !team['description'].toLowerCase().contains(query) &&
+              !team['sport'].toLowerCase().contains(query)) {
+            return false;
+          }
+        }
+        
+        return true;
+      }).toList();
+    });
+  }
+
+  void _onSearchChanged(String query) {
+    _applyFilters();
+  }
+
+  void _onFilterChanged() {
+    _applyFilters();
+  }
+
+  Future<void> _joinTeam(Map<String, dynamic> team) async {
+    try {
+      // Show loading state
+      setState(() {
+        _isLoading = true;
+      });
+
+      // Get team service
+      final teamService = ServiceLocator.instance.teamService;
+      
+      // Join team using service
+      final success = await teamService.joinTeam(team['id']);
+      
+      if (success && mounted) {
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Successfully joined ${team['name']}!'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
           ),
-          child: SafeArea(
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  // App Bar
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          onPressed: () => Navigator.pop(context),
-                          icon: const Icon(Icons.arrow_back),
-                        ),
-                        // Avoid Expanded + Flexible conflict from SafeTitleText
-                        Flexible(
-                          child: SafeTitleText(
-                            'Find Teams',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface,
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                        const SizedBox(width: 48), // Balance the back button
-                      ],
-                    ),
-                  ),
+        );
+        
+        // Refresh teams list to show updated member count
+        _loadTeams();
+      } else {
+        throw Exception('Failed to join team');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to join team: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
-                  // Search and Filter Section
-                  FadeTransition(
-                    opacity: _searchFade,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Column(
-                        children: [
-                          // Search Bar
-                          Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  Theme.of(context).colorScheme.surface,
-                                  Theme.of(context).colorScheme.surface.withValues(alpha: 0.8),
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
-                              ),
-                            ),
-                            child: TextField(
-                              controller: _searchControllerText,
-                              onChanged: (value) {
-                                setState(() {
-                                  _searchQuery = value;
-                                });
-                              },
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-                              decoration: InputDecoration(
-                                hintText: 'Search teams...',
-                                hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
-                                prefixIcon: Icon(
-                                  Icons.search,
-                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                                ),
-                                border: InputBorder.none,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                              ),
-                            ),
-                          ),
+  void _showFiltersDialog() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _buildFiltersSheet(),
+    );
+  }
 
-                          const SizedBox(height: 16),
-
-                          // Sport Filter
-                          SizedBox(
-                            height: 50,
-                            child: ListView.builder(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: _sports.length,
-                              itemBuilder: (context, index) {
-                                final sport = _sports[index];
-                                final isSelected = _selectedSport == sport;
-                                return GestureDetector(
-                                  onTap: () {
-                                    setState(() {
-                                      _selectedSport = sport;
-                                    });
-                                  },
-                                  child: Container(
-                                    margin: const EdgeInsets.only(right: 12),
-                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors: isSelected
-                                            ? [
-                                                Theme.of(context).colorScheme.primary,
-                                                Theme.of(context).colorScheme.primary.withValues(alpha: 0.8)
-                                              ]
-                                            : [
-                                                Theme.of(context).colorScheme.surface.withValues(alpha: 0.6),
-                                                Theme.of(context).colorScheme.surface.withValues(alpha: 0.4)
-                                              ],
-                                      ),
-                                      borderRadius: BorderRadius.circular(25),
-                                      border: Border.all(
-                                        color: isSelected
-                                            ? Theme.of(context).colorScheme.primary
-                                            : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
-                                      ),
-                                    ),
-                                    child: Center(
-                                      child: SafeLabelText(
-                                        sport,
-                                        style: TextStyle(
-                                          color: isSelected ? Theme.of(context).colorScheme.onSurface : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
-                                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // AI demo removed
-
-                  const SizedBox(height: 20),
-
-                  // Teams List
-                  _isLoading
-                      ? Center(child: CircularProgressIndicator(color: Theme.of(context).colorScheme.primary))
-                      : StreamBuilder<QuerySnapshot>(
-                          stream: FirebaseFirestore.instance.collection('teams').snapshots(),
-                          builder: (context, snapshot) {
-                            if (snapshot.hasError) {
-                              return Center(
-                                child: SafeLabelText(
-                                  'Error loading teams',
-                                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)),
-                                ),
-                              );
-                            }
-
-                            if (!snapshot.hasData) {
-                              return Center(
-                                child: CircularProgressIndicator(color: Theme.of(context).colorScheme.primary),
-                              );
-                            }
-
-                            var teams = snapshot.data!.docs.map((doc) {
-                              final data = doc.data() as Map<String, dynamic>;
-                              return {'id': doc.id, ...data};
-                            }).toList();
-
-                            // Apply filters
-                            if (_selectedSport != 'All') {
-                              teams = teams.where((team) => 
-                                (team['sport']?.toString().toLowerCase() ?? '') == _selectedSport.toLowerCase()
-                              ).toList();
-                            }
-
-                            if (_searchQuery.isNotEmpty) {
-                              teams = teams.where((team) =>
-                                (team['name']?.toString().toLowerCase() ?? '').contains(_searchQuery.toLowerCase()) ||
-                                (team['location']?.toString().toLowerCase() ?? '').contains(_searchQuery.toLowerCase())
-                              ).toList();
-                            }
-
-                            if (teams.isEmpty) {
-                              return Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.search_off,
-                                      size: 64,
-                                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    SafeTitleText(
-                                      'No teams found',
-                                      style: TextStyle(
-                                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                                        fontSize: 18,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    SafeBodyText(
-                                      'Try adjusting your search or filters',
-                                      style: TextStyle(
-                                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }
-
-                            return ListView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
-                              itemCount: teams.length,
-                              itemBuilder: (context, index) {
-                                final team = teams[index];
-                                return _buildTeamCard(team);
-                              },
-                            );
-                          },
-                        ),
-
-                  const SizedBox(height: 20),
-                ],
+  Widget _buildFiltersSheet() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Filters',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    _selectedSport = 'All';
+                    _selectedSkillLevel = 'All';
+                    _selectedLocation = 'All';
+                    _showOnlyRecruiting = true;
+                    _showOnlyActive = true;
+                    _showOnlyFree = false;
+                  });
+                  _onFilterChanged();
+                  Navigator.pop(context);
+                },
+                child: const Text('Reset'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // Sport filter
+          const Text('Sport', style: TextStyle(fontWeight: FontWeight.bold)),
+          DropdownButtonFormField<String>(
+            value: _selectedSport,
+            decoration: const InputDecoration(border: OutlineInputBorder()),
+            items: _availableSports.map((sport) {
+              return DropdownMenuItem(value: sport, child: Text(sport));
+            }).toList(),
+            onChanged: (value) {
+              setState(() {
+                _selectedSport = value!;
+              });
+            },
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Skill level filter
+          const Text('Skill Level', style: TextStyle(fontWeight: FontWeight.bold)),
+          DropdownButtonFormField<String>(
+            value: _selectedSkillLevel,
+            decoration: const InputDecoration(border: OutlineInputBorder()),
+            items: _skillLevels.map((level) {
+              return DropdownMenuItem(value: level, child: Text(level));
+            }).toList(),
+            onChanged: (value) {
+              setState(() {
+                _selectedSkillLevel = value!;
+              });
+            },
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Location filter
+          const Text('Location', style: TextStyle(fontWeight: FontWeight.bold)),
+          DropdownButtonFormField<String>(
+            value: _selectedLocation,
+            decoration: const InputDecoration(border: OutlineInputBorder()),
+            items: _locations.map((location) {
+              return DropdownMenuItem(value: location, child: Text(location));
+            }).toList(),
+            onChanged: (value) {
+              setState(() {
+                _selectedLocation = value!;
+              });
+            },
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Other filters
+          SwitchListTile(
+            title: const Text('Show only recruiting teams'),
+            value: _showOnlyRecruiting,
+            onChanged: (value) {
+              setState(() {
+                _showOnlyRecruiting = value;
+              });
+            },
+          ),
+          
+          SwitchListTile(
+            title: const Text('Show only active teams'),
+            value: _showOnlyActive,
+            onChanged: (value) {
+              setState(() {
+                _showOnlyActive = value;
+              });
+            },
+          ),
+
+          SwitchListTile(
+            title: const Text('Show only free teams'),
+            value: _showOnlyFree,
+            onChanged: (value) {
+              setState(() {
+                _showOnlyFree = value;
+              });
+            },
+          ),
+          
+          const SizedBox(height: 16),
+          
+          SizedBox(
+            width: double.infinity,
+            child: AppButton(
+              text: 'Apply Filters',
+              onPressed: () {
+                _onFilterChanged();
+                Navigator.pop(context);
+              },
             ),
           ),
-        ),
+        ],
       ),
     );
   }
 
   Widget _buildTeamCard(Map<String, dynamic> team) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Theme.of(context).colorScheme.surface,
-            Theme.of(context).colorScheme.surface.withValues(alpha: 0.8),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              // Team Avatar
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(25),
+                ),
+                child: Icon(
+                  _getSportIcon(team['sport']),
+                  color: AppColors.primary,
+                  size: 24,
+                ),
+              ),
+              
+              const SizedBox(width: 16),
+              
+              // Team Info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      team['name'],
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      team['sport'],
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Status Badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: team['isRecruiting'] ? Colors.green : Colors.orange,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  team['isRecruiting'] ? 'Recruiting' : 'Full',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 12),
+          
+          Text(
+            team['description'],
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          
+          const SizedBox(height: 12),
+          
+          Row(
+            children: [
+              _buildStatItem(
+                'Members',
+                '${team['memberCount']}/${team['maxMembers']}',
+                Icons.people,
+              ),
+              const SizedBox(width: 24),
+              _buildStatItem(
+                'Level',
+                team['skillLevel'],
+                Icons.trending_up,
+              ),
+              const SizedBox(width: 24),
+              _buildStatItem(
+                'Location',
+                team['location'],
+                Icons.location_on,
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 12),
+          
+          Row(
+            children: [
+              if (team['monthlyFee'] > 0) ...[
+                Icon(Icons.attach_money, size: 16, color: Colors.grey[600]),
+                const SizedBox(width: 4),
+                Text(
+                  '\$${team['monthlyFee'].toStringAsFixed(0)}/month',
+                  style: TextStyle(color: Colors.grey[600]),
+                ),
+                const SizedBox(width: 16),
+              ],
+              
+              if (team['requiresTryout']) ...[
+                Icon(Icons.sports, size: 16, color: Colors.orange),
+                const SizedBox(width: 4),
+                Text(
+                  'Tryout Required',
+                  style: TextStyle(color: Colors.orange),
+                ),
+                const SizedBox(width: 16),
+              ],
+            ],
+          ),
+          
+          const SizedBox(height: 16),
+          
+          SizedBox(
+            width: double.infinity,
+            child: AppButton(
+              text: team['isRecruiting'] ? 'Request to Join' : 'Team Full',
+              onPressed: team['isRecruiting'] ? () => _joinTeam(team) : null,
+            ),
           ),
         ],
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => _showTeamDetails(team),
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
+    );
+  }
+
+  Widget _buildStatItem(String label, String value, IconData icon) {
+    return Expanded(
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: Colors.grey[600]),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _getSportIcon(String sport) {
+    switch (sport.toLowerCase()) {
+      case 'basketball':
+        return Icons.sports_basketball;
+      case 'soccer':
+        return Icons.sports_soccer;
+      case 'volleyball':
+        return Icons.sports_volleyball;
+      case 'tennis':
+        return Icons.sports_tennis;
+      case 'baseball':
+        return Icons.sports_baseball;
+      case 'hockey':
+        return Icons.sports_hockey;
+      case 'cricket':
+        return Icons.sports_cricket;
+      case 'rugby':
+        return Icons.sports_rugby;
+      case 'badminton':
+        return Icons.sports_tennis;
+      case 'table tennis':
+        return Icons.sports_tennis;
+      case 'golf':
+        return Icons.sports_golf;
+      case 'swimming':
+        return Icons.pool;
+      case 'running':
+        return Icons.directions_run;
+      case 'cycling':
+        return Icons.directions_bike;
+      default:
+        return Icons.sports;
+    }
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.group_outlined,
+            size: 64,
+            color: Colors.grey[400],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No teams found',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Try adjusting your filters or search terms',
+            style: TextStyle(
+              color: Colors.grey[500],
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          AppButton(
+            text: 'Create a Team',
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const TeamCreationScreen(),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Discover Teams'),
+        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+        foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
+        actions: [
+          IconButton(
+            onPressed: _showFiltersDialog,
+            icon: const Icon(Icons.filter_list),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // Search and filters bar
+          Container(
             padding: const EdgeInsets.all(16),
-            child: Row(
+            child: Column(
               children: [
-                // Team Icon/Logo
-                Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
-                        Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: team['imageUrl'] != null && team['imageUrl'].toString().isNotEmpty
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: CachedNetworkImage(
-                            imageUrl: team['imageUrl'],
-                            width: 50,
-                            height: 50,
-                            fit: BoxFit.cover,
-                            placeholder: (context, url) => Container(
-                              width: 50,
-                              height: 50,
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Center(
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Theme.of(context).colorScheme.onSurface,
-                                ),
-                              ),
-                            ),
-                            errorWidget: (context, url, error) => Image.asset(
-                              _getSportIcon(team['sport'] ?? 'Basketball'),
-                              width: 25,
-                              height: 25,
-                            ),
-                          ),
-                        )
-                      : Image.asset(
-                          _getSportIcon(team['sport'] ?? 'Basketball'),
-                          width: 25,
-                          height: 25,
-                        ),
+                ModernInputField(
+                  controller: _searchController,
+                  label: 'Search teams',
+                  hint: 'Search by name, sport, or description...',
+                  onChanged: _onSearchChanged,
                 ),
                 
-                const SizedBox(width: 16),
+                const SizedBox(height: 12),
                 
-                // Team Info
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                // Quick filters
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
                     children: [
-                      SafeTitleText(
-                        team['name'] ?? 'Team Name',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      SafeLabelText(
-                        team['sport'] ?? 'Sport',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.location_on,
-                            size: 14,
-                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                          ),
-                          const SizedBox(width: 4),
-                          SafeLabelText(
-                            team['location'] ?? 'Unknown Location',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
+                      _buildQuickFilterChip('Recruiting', _showOnlyRecruiting, (value) {
+                        setState(() {
+                          _showOnlyRecruiting = value;
+                        });
+                        _onFilterChanged();
+                      }),
+                      const SizedBox(width: 8),
+                      _buildQuickFilterChip('Active', _showOnlyActive, (value) {
+                        setState(() {
+                          _showOnlyActive = value;
+                        });
+                        _onFilterChanged();
+                      }),
+                      const SizedBox(width: 8),
+                      _buildQuickFilterChip('Free', _showOnlyFree, (value) {
+                        setState(() {
+                          _showOnlyFree = value;
+                        });
+                        _onFilterChanged();
+                      }),
                     ],
                   ),
-                ),
-                
-                // Arrow indicator
-                Icon(
-                  Icons.arrow_forward_ios,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
-                  size: 16,
                 ),
               ],
             ),
           ),
-        ),
+          
+          // Results count
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '${_filteredTeams.length} team${_filteredTeams.length != 1 ? 's' : ''} found',
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Teams list
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _filteredTeams.isEmpty
+                    ? _buildEmptyState()
+                    : RefreshIndicator(
+                        onRefresh: _loadTeams,
+                        child: ListView.separated(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: _filteredTeams.length,
+                          separatorBuilder: (context, index) => const SizedBox(height: 16),
+                          itemBuilder: (context, index) => _buildTeamCard(_filteredTeams[index]),
+                        ),
+                      ),
+          ),
+        ],
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const TeamCreationScreen(),
+            ),
+          );
+        },
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  Widget _buildQuickFilterChip(String label, bool isSelected, ValueChanged<bool> onChanged) {
+    return FilterChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: onChanged,
+      selectedColor: Theme.of(context).colorScheme.primaryContainer,
+      checkmarkColor: Theme.of(context).colorScheme.primary,
     );
   }
 }

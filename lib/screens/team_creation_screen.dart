@@ -1,263 +1,146 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:image_picker/image_picker.dart';
-import 'dart:io';
-import '../services/interfaces/team_service_interface.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
+import '../core/theme/app_colors.dart';
+import '../widgets/common/app_button.dart';
 import '../services/service_locator.dart';
-import '../utils/safe_text.dart';
-import '../services/image_uploader.dart';
 
-class TeamCreationScreen extends StatefulWidget {
+import '../widgets/modern_input_field.dart';
+
+class TeamCreationScreen extends ConsumerStatefulWidget {
   const TeamCreationScreen({super.key});
 
   @override
-  State<TeamCreationScreen> createState() => _TeamCreationScreenState();
+  ConsumerState<TeamCreationScreen> createState() => _TeamCreationScreenState();
 }
 
-class _TeamCreationScreenState extends State<TeamCreationScreen>
-    with TickerProviderStateMixin {
-  late AnimationController _formController;
-  late Animation<Offset> _formSlide;
-  late Animation<double> _formFade;
-
+class _TeamCreationScreenState extends ConsumerState<TeamCreationScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _teamNameController = TextEditingController();
+  final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _locationController = TextEditingController();
+  final _mottoController = TextEditingController();
+  
+  String _selectedSport = 'Football';
+  String _selectedSkillLevel = 'All Levels';
+  String _selectedLocation = 'Current Location';
+  String _selectedPrivacy = 'Public';
+  
 
-  String _selectedSport = 'Basketball';
-  String _selectedLevel = 'Mixed';
-  int _maxMembers = 10;
+  int _maxMembers = 20;
+  bool _isRecruiting = true;
+  bool _requiresTryout = false;
+  double? _monthlyFee = 0.0;
   bool _isLoading = false;
-  String? _teamLogoUrl;
-  late final TeamServiceInterface _teamService;
-
-  // Colors will be accessed directly via Theme.of(context)
-
-  final List<String> _sports = [
-    'Basketball',
-    'Soccer',
-    'Volleyball',
-    'Tennis',
-    'Badminton',
-    'Table Tennis',
-    'Cricket',
-    'Baseball',
-    'Hockey',
-    'Rugby',
-    'American Football',
-    'Swimming',
-    'Running',
-    'Cycling',
-    'Gym',
-    'Other'
+  
+  final List<String> _availableSports = [
+    'Football', 'Basketball', 'Tennis', 'Volleyball', 'Baseball',
+    'Soccer', 'Hockey', 'Cricket', 'Rugby', 'Badminton',
+    'Table Tennis', 'Golf', 'Swimming', 'Running', 'Cycling', 'Other'
   ];
-
-  final List<String> _levels = [
-    'Beginner',
-    'Intermediate',
-    'Advanced',
-    'Mixed',
-    'Professional'
+  
+  final List<String> _skillLevels = [
+    'Beginner', 'Intermediate', 'Advanced', 'Professional', 'All Levels'
   ];
-
-  @override
-  void initState() {
-    super.initState();
-    _teamService = ServiceLocator.instance.teamService;
-    
-    _formController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
-
-    _formSlide = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _formController,
-      curve: Curves.easeOutCubic,
-    ));
-
-    _formFade = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _formController,
-      curve: Curves.easeIn,
-    ));
-
-    _formController.forward();
-  }
+  
+  final List<String> _privacyOptions = [
+    'Public', 'Private', 'Invite Only'
+  ];
 
   @override
   void dispose() {
-    _formController.dispose();
-    _teamNameController.dispose();
+    _nameController.dispose();
     _descriptionController.dispose();
-    _locationController.dispose();
+    _mottoController.dispose();
     super.dispose();
   }
 
-  String _getSportIcon(String sport) {
-    switch (sport.toLowerCase()) {
-      case 'basketball':
-        return 'assets/basketball.png';
-      case 'soccer':
-        return 'assets/ball.png';
-      case 'volleyball':
-        return 'assets/volleyball.png';
-      default:
-        return 'assets/basketball.png';
-    }
-  }
-
-  // Show image picker for logo selection
-  Future<void> _showLogoPicker() async {
-    final ImagePicker picker = ImagePicker();
-    final navigator = Navigator.of(context);
-    
+  Future<void> _getCurrentLocation() async {
     try {
-      final XFile? image = await showDialog<XFile>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Choose Team Logo'),
-          content: const Text('Select an image from your device'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () async {
-                final XFile? pickedImage = await picker.pickImage(
-                  source: ImageSource.gallery,
-                  maxWidth: 512,
-                  maxHeight: 512,
-                  imageQuality: 80,
-                );
-                if (mounted) {
-                  navigator.pop(pickedImage);
-                }
-              },
-              child: const Text('Gallery'),
-            ),
-            TextButton(
-              onPressed: () async {
-                final XFile? pickedImage = await picker.pickImage(
-                  source: ImageSource.camera,
-                  maxWidth: 512,
-                  maxHeight: 512,
-                  imageQuality: 80,
-                );
-                if (mounted) {
-                  navigator.pop(pickedImage);
-                }
-              },
-              child: const Text('Camera'),
-            ),
-          ],
+      // Check permissions
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          _showLocationError('Location permission denied');
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        _showLocationError('Location permissions are permanently denied');
+        return;
+      }
+
+      // Get current position
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
         ),
       );
-      
-      if (image != null) {
-        await _uploadLogo(File(image.path));
-      }
+
+      setState(() {
+        _selectedLocation = '${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}';
+      });
     } catch (e) {
-      if (mounted) {
-        final messenger = ScaffoldMessenger.of(context);
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text('Error picking image: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      _showLocationError('Failed to get location: $e');
     }
   }
 
-  // Handle logo upload
-  Future<void> _uploadLogo(File imageFile) async {
-    try {
-      setState(() => _isLoading = true);
-      
-      // Upload to Firebase Storage
-      final downloadUrl = await ImageUploader.uploadImage(
-        imageFile,
-        pathPrefix: 'team_logos',
-      );
-      
-      setState(() {
-        _teamLogoUrl = downloadUrl;
-        _isLoading = false;
-      });
-      
-      if (mounted) {
-        final messenger = ScaffoldMessenger.of(context);
-        messenger.showSnackBar(
-          const SnackBar(
-            content: Text('Logo selected successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        final messenger = ScaffoldMessenger.of(context);
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text('Error uploading logo: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
+  void _showLocationError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Future<void> _createTeam() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
-
     try {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
-      if (uid == null) throw Exception('User not authenticated');
+      // Show loading state
+      setState(() {
+        _isLoading = true;
+      });
 
+      // Get team service
+      final teamService = ServiceLocator.instance.teamService;
+      
+      // Prepare team data
       final teamData = {
-        'name': _teamNameController.text.trim(),
-        'sport': _selectedSport,
-        'location': _locationController.text.trim(),
+        'name': _nameController.text.trim(),
         'description': _descriptionController.text.trim(),
-        'level': _selectedLevel,
+        'sport': _selectedSport,
+        'skillLevel': _selectedSkillLevel,
+        'city': _selectedLocation,
+        'motto': _mottoController.text.trim(),
         'maxMembers': _maxMembers,
-        'memberCount': 1, // Creator is the first member
-        'createdBy': uid,
-        'createdAt': Timestamp.now(),
-        'members': [uid], // Creator is automatically a member
-        'pendingRequests': [],
-        'imageUrl': _teamLogoUrl, // Include team logo URL if selected
+        'isRecruiting': _isRecruiting,
+        'requiresTryout': _requiresTryout,
+        'monthlyFee': _monthlyFee ?? 0.0,
+        'isActive': true,
+        'isPublic': _selectedPrivacy == 'Public',
+        'createdAt': DateTime.now(),
+        'updatedAt': DateTime.now(),
       };
 
-      final success = await _teamService.createTeam(teamData);
-
+      // Create team using service
+      final success = await teamService.createTeam(teamData);
+      
       if (success && mounted) {
+        // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Flexible(
-              child: Text(
-                'Team "${_teamNameController.text.trim()}" created successfully!',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            backgroundColor: Colors.green,
+            content: const Text('Team created successfully!'),
+            backgroundColor: AppColors.green,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
-        Navigator.pop(context, true); // Return true to indicate success
+        
+        // Navigate back
+        Navigator.of(context).pop();
       } else {
         throw Exception('Failed to create team');
       }
@@ -265,573 +148,275 @@ class _TeamCreationScreenState extends State<TeamCreationScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Flexible(
-              child: Text(
-                'Error creating team: ${e.toString()}',
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
+            content: Text('Failed to create team: $e'),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
       }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
+  }
+
+  Widget _buildSectionHeader(String title, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, color: AppColors.primary, size: 20),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
+        ),
+      ],
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    // Apply text scaling limits to prevent overflow
-    final textScaler = MediaQuery.of(context).textScaler.clamp(
-      minScaleFactor: 1.0,
-      maxScaleFactor: 1.2,
-    );
-    
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      body: MediaQuery(
-        data: MediaQuery.of(context).copyWith(textScaler: textScaler),
-        child: Container(
-                  decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Theme.of(context).colorScheme.surface, Theme.of(context).colorScheme.surface],
-          ),
-        ),
-          child: SafeArea(
-            child: Column(
-              children: [
-                // App Bar
-                Padding(
-                  padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.04),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: Icon(
-                          Icons.arrow_back,
-                          color: Theme.of(context).colorScheme.onSurface,
-                          size: MediaQuery.of(context).size.width * 0.06,
-                        ),
-                      ),
-                      Expanded(
-                        child: SafeTitleText(
-                          'Create Team',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontSize: MediaQuery.of(context).size.width * 0.06,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                      SizedBox(width: MediaQuery.of(context).size.width * 0.12),
-                    ],
-                  ),
+      appBar: AppBar(
+        title: const Text('Create Team'),
+        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+        foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
+      ),
+      body: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Basic Information
+              _buildSectionHeader('Basic Information', Icons.info),
+              const SizedBox(height: 16),
+              
+              ModernInputField(
+                controller: _nameController,
+                label: 'Team Name',
+                hint: 'Enter your team name',
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Team name is required';
+                  }
+                  return null;
+                },
+              ),
+              
+              const SizedBox(height: 16),
+              
+              ModernInputField(
+                controller: _descriptionController,
+                label: 'Description',
+                hint: 'Describe your team',
+                maxLines: 3,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Description is required';
+                  }
+                  return null;
+                },
+              ),
+              
+              const SizedBox(height: 16),
+              
+              ModernInputField(
+                controller: _mottoController,
+                label: 'Team Motto (Optional)',
+                hint: 'e.g., "Together we win"',
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // Sport & Level
+              _buildSectionHeader('Sport & Level', Icons.sports),
+              const SizedBox(height: 16),
+              
+              DropdownButtonFormField<String>(
+                value: _selectedSport,
+                decoration: const InputDecoration(
+                  labelText: 'Primary Sport',
+                  border: OutlineInputBorder(),
                 ),
-
-                // Form
-                Expanded(
-                  child: SlideTransition(
-                    position: _formSlide,
-                    child: FadeTransition(
-                      opacity: _formFade,
-                      child: SingleChildScrollView(
-                        padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.04),
-                        child: Form(
-                          key: _formKey,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Sport Selection
-                              SafeLabelText(
-                                'Sport',
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurface,
-                                  fontSize: MediaQuery.of(context).size.width * 0.045,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              SizedBox(height: MediaQuery.of(context).size.height * 0.015),
-                              Container(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      Theme.of(context).colorScheme.surface,
-                                      Theme.of(context).colorScheme.surface.withValues(alpha: 0.8),
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.2),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: DropdownButtonFormField<String>(
-                                  value: _selectedSport,
-                                  dropdownColor: Theme.of(context).colorScheme.surface,
-                                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-                                  decoration: InputDecoration(
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                      borderSide: BorderSide.none,
-                                    ),
-                                    filled: true,
-                                    fillColor: Colors.transparent,
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                  ),
-                                  items: _sports.map((sport) {
-                                    return DropdownMenuItem(
-                                      value: sport,
-                                      child: Row(
-                                        children: [
-                                          Image.asset(
-                                            _getSportIcon(sport),
-                                            width: MediaQuery.of(context).size.width * 0.06,
-                                            height: MediaQuery.of(context).size.width * 0.06,
-                                            errorBuilder: (context, error, stackTrace) => Icon(
-                                              Icons.sports_soccer,
-                                              size: MediaQuery.of(context).size.width * 0.06,
-                                              color: Theme.of(context).colorScheme.primary,
-                                            ),
-                                          ),
-                                          SizedBox(width: MediaQuery.of(context).size.width * 0.03),
-                                          SafeLabelText(
-                                            sport,
-                                            style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  }).toList(),
-                                  onChanged: (value) => setState(() => _selectedSport = value!),
-                                ),
-                              ),
-
-                              SizedBox(height: MediaQuery.of(context).size.height * 0.03),
-
-                              // Team Name
-                              SafeLabelText(
-                                'Team Name',
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurface,
-                                  fontSize: MediaQuery.of(context).size.width * 0.045,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              SizedBox(height: MediaQuery.of(context).size.height * 0.015),
-                              Container(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      Theme.of(context).colorScheme.surface,
-                                      Theme.of(context).colorScheme.surface.withValues(alpha: 0.8),
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.2),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: TextFormField(
-                                  controller: _teamNameController,
-                                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-                                  decoration: InputDecoration(
-                                    hintText: 'Enter team name',
-                                    hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                      borderSide: BorderSide.none,
-                                    ),
-                                    filled: true,
-                                    fillColor: Colors.transparent,
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                  ),
-                                  validator: (value) {
-                                    if (value == null || value.trim().isEmpty) {
-                                      return 'Team name is required';
-                                    }
-                                    if (value.trim().length < 3) {
-                                      return 'Team name must be at least 3 characters';
-                                    }
-                                    if (value.trim().length > 50) {
-                                      return 'Team name must be less than 50 characters';
-                                    }
-                                    return null;
-                                  },
-                                ),
-                              ),
-
-                              SizedBox(height: MediaQuery.of(context).size.height * 0.03),
-
-                              // Location
-                              SafeLabelText(
-                                'Location',
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurface,
-                                  fontSize: MediaQuery.of(context).size.width * 0.045,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              SizedBox(height: MediaQuery.of(context).size.height * 0.015),
-                              Container(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      Theme.of(context).colorScheme.surface,
-                                      Theme.of(context).colorScheme.surface.withValues(alpha: 0.8),
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.2),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: TextFormField(
-                                  controller: _locationController,
-                                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-                                  decoration: InputDecoration(
-                                    hintText: 'Where do you play?',
-                                    hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
-                                    prefixIcon: Icon(
-                                      Icons.location_on,
-                                      color: Theme.of(context).colorScheme.secondary,
-                                      size: MediaQuery.of(context).size.width * 0.06,
-                                    ),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                      borderSide: BorderSide.none,
-                                    ),
-                                    filled: true,
-                                    fillColor: Colors.transparent,
-                                  ),
-                                  validator: (value) {
-                                    if (value == null || value.trim().isEmpty) {
-                                      return 'Location is required';
-                                    }
-                                    return null;
-                                  },
-                                ),
-                              ),
-
-                              SizedBox(height: MediaQuery.of(context).size.height * 0.03),
-
-                              // Level
-                              SafeLabelText(
-                                'Skill Level',
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurface,
-                                  fontSize: MediaQuery.of(context).size.width * 0.045,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              SizedBox(height: MediaQuery.of(context).size.height * 0.015),
-                              Container(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      Theme.of(context).colorScheme.surface,
-                                      Theme.of(context).colorScheme.surface.withValues(alpha: 0.8),
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.2),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: DropdownButtonFormField<String>(
-                                  value: _selectedLevel,
-                                  dropdownColor: Theme.of(context).colorScheme.surface,
-                                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-                                  decoration: InputDecoration(
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                      borderSide: BorderSide.none,
-                                    ),
-                                    filled: true,
-                                    fillColor: Colors.transparent,
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                  ),
-                                  items: _levels.map((level) {
-                                    return DropdownMenuItem(
-                                      value: level,
-                                      child: SafeLabelText(
-                                        level,
-                                        style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-                                      ),
-                                    );
-                                  }).toList(),
-                                  onChanged: (value) => setState(() => _selectedLevel = value!),
-                                ),
-                              ),
-
-                              SizedBox(height: MediaQuery.of(context).size.height * 0.03),
-
-                              // Max Members
-                              SafeLabelText(
-                                'Maximum Members',
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurface,
-                                  fontSize: MediaQuery.of(context).size.width * 0.045,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              SizedBox(height: MediaQuery.of(context).size.height * 0.015),
-                              Container(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      Theme.of(context).colorScheme.surface,
-                                      Theme.of(context).colorScheme.surface.withValues(alpha: 0.8),
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.2),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: SliderTheme(
-                                  data: SliderTheme.of(context).copyWith(
-                                    activeTrackColor: Theme.of(context).colorScheme.primary,
-                                    inactiveTrackColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2),
-                                    thumbColor: Theme.of(context).colorScheme.primary,
-                                    overlayColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
-                                    valueIndicatorColor: Theme.of(context).colorScheme.primary,
-                                    valueIndicatorTextStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-                                  ),
-                                  child: Slider(
-                                    value: _maxMembers.toDouble(),
-                                    min: 5,
-                                    max: 30,
-                                    divisions: 25,
-                                    label: _maxMembers.toString(),
-                                    onChanged: (value) => setState(() => _maxMembers = value.round()),
-                                  ),
-                                ),
-                              ),
-                              Center(
-                                child: SafeLabelText(
-                                  '$_maxMembers members',
-                                  style: TextStyle(
-                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                                    fontSize: MediaQuery.of(context).size.width * 0.04,
-                                  ),
-                                ),
-                              ),
-
-                              SizedBox(height: MediaQuery.of(context).size.height * 0.03),
-
-                              // Team Logo
-                              SafeLabelText(
-                                'Team Logo (Optional)',
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurface,
-                                  fontSize: MediaQuery.of(context).size.width * 0.045,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              SizedBox(height: MediaQuery.of(context).size.height * 0.015),
-                              Container(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      Theme.of(context).colorScheme.surface,
-                                      Theme.of(context).colorScheme.surface.withValues(alpha: 0.8),
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
-                                ),
-                                child: Column(
-                                  children: [
-                                    // Current logo or placeholder
-                                    Container(
-                                      height: 80,
-                                      width: 80,
-                                      margin: const EdgeInsets.all(16),
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey[800],
-                                        borderRadius: BorderRadius.circular(40),
-                                        border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2)),
-                                      ),
-                                      child: _teamLogoUrl != null
-                                          ? ClipRRect(
-                                              borderRadius: BorderRadius.circular(40),
-                                              child: Image.network(
-                                                _teamLogoUrl!,
-                                                fit: BoxFit.cover,
-                                                errorBuilder: (context, error, stackTrace) => Icon(
-                                                  Icons.sports_soccer,
-                                                  size: 40,
-                                                  color: Colors.grey[400],
-                                                ),
-                                              ),
-                                            )
-                                          : Icon(
-                                              Icons.add_photo_alternate,
-                                              size: 40,
-                                              color: Colors.grey[400],
-                                            ),
-                                    ),
-                                    // Logo selection button
-                                    Padding(
-                                      padding: const EdgeInsets.only(bottom: 16),
-                                      child: TextButton.icon(
-                                        onPressed: _showLogoPicker,
-                                        icon: const Icon(Icons.photo_library, size: 16),
-                                        label: const Text('Choose Logo'),
-                                        style: TextButton.styleFrom(
-                                          foregroundColor: Theme.of(context).colorScheme.primary,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-
-                              SizedBox(height: MediaQuery.of(context).size.height * 0.03),
-
-                              // Description
-                              SafeLabelText(
-                                'Description (Optional)',
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurface,
-                                  fontSize: MediaQuery.of(context).size.width * 0.045,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              SizedBox(height: MediaQuery.of(context).size.height * 0.015),
-                              Container(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      Theme.of(context).colorScheme.surface,
-                                      Theme.of(context).colorScheme.surface.withValues(alpha: 0.8),
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.2),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: TextFormField(
-                                  controller: _descriptionController,
-                                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-                                  maxLines: 4,
-                                  maxLength: 200,
-                                  decoration: InputDecoration(
-                                    hintText: 'Tell others about your team...',
-                                    hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                      borderSide: BorderSide.none,
-                                    ),
-                                    filled: true,
-                                    fillColor: Colors.transparent,
-                                    contentPadding: const EdgeInsets.all(16),
-                                    counterStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
-                                  ),
-                                ),
-                              ),
-
-                              SizedBox(height: MediaQuery.of(context).size.height * 0.04),
-
-                              // Logo upload section
-                              SizedBox(height: MediaQuery.of(context).size.height * 0.02),
-
-                              // Create Button
-                              SizedBox(
-                                width: double.infinity,
-                                height: MediaQuery.of(context).size.height * 0.07,
-                                child: ElevatedButton(
-                                  onPressed: _isLoading ? null : _createTeam,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Theme.of(context).colorScheme.primary,
-                                    foregroundColor: Theme.of(context).colorScheme.onSurface,
-                                    elevation: 8,
-                                    shadowColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                  ),
-                                  child: _isLoading
-                                      ? SizedBox(
-                                          width: MediaQuery.of(context).size.width * 0.06,
-                                          height: MediaQuery.of(context).size.width * 0.06,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.onSurface),
-                                          ),
-                                        )
-                                      : SafeButtonText(
-                                          'CREATE TEAM',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: MediaQuery.of(context).size.width * 0.04,
-                                            letterSpacing: 1,
-                                          ),
-                                        ),
-                                ),
-                              ),
-
-                              SizedBox(height: MediaQuery.of(context).size.height * 0.05),
-                            ],
-                          ),
-                        ),
+                items: _availableSports.map((sport) {
+                  return DropdownMenuItem(value: sport, child: Text(sport));
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedSport = value!;
+                  });
+                },
+              ),
+              
+              const SizedBox(height: 16),
+              
+              DropdownButtonFormField<String>(
+                value: _selectedSkillLevel,
+                decoration: const InputDecoration(
+                  labelText: 'Skill Level',
+                  border: OutlineInputBorder(),
+                ),
+                items: _skillLevels.map((level) {
+                  return DropdownMenuItem(value: level, child: Text(level));
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedSkillLevel = value!;
+                  });
+                },
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // Team Settings
+              _buildSectionHeader('Team Settings', Icons.settings),
+              const SizedBox(height: 16),
+              
+              DropdownButtonFormField<String>(
+                value: _selectedPrivacy,
+                decoration: const InputDecoration(
+                  labelText: 'Privacy',
+                  border: OutlineInputBorder(),
+                ),
+                items: _privacyOptions.map((option) {
+                  return DropdownMenuItem(value: option, child: Text(option));
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedPrivacy = value!;
+                  });
+                },
+              ),
+              
+              const SizedBox(height: 16),
+              
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Max Members: $_maxMembers',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                   ),
+                  Expanded(
+                    child: Slider(
+                      value: _maxMembers.toDouble(),
+                      min: 5,
+                      max: 50,
+                      divisions: 45,
+                      label: _maxMembers.toString(),
+                      onChanged: (value) {
+                        setState(() {
+                          _maxMembers = value.round();
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 16),
+              
+              SwitchListTile(
+                title: const Text('Currently Recruiting'),
+                value: _isRecruiting,
+                onChanged: (value) {
+                  setState(() {
+                    _isRecruiting = value;
+                  });
+                },
+              ),
+              
+              SwitchListTile(
+                title: const Text('Requires Tryout'),
+                value: _requiresTryout,
+                onChanged: (value) {
+                  setState(() {
+                    _requiresTryout = value;
+                  });
+                },
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // Location
+              _buildSectionHeader('Location', Icons.location_on),
+              const SizedBox(height: 16),
+              
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Location: $_selectedLocation',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  AppButton(
+                    text: 'Get Current',
+                    onPressed: _getCurrentLocation,
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // Monthly Fee
+              _buildSectionHeader('Membership', Icons.payment),
+              const SizedBox(height: 16),
+              
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Monthly Fee: \$${_monthlyFee?.toStringAsFixed(2) ?? '0.00'}',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Slider(
+                      value: _monthlyFee ?? 0.0,
+                      min: 0.0,
+                      max: 100.0,
+                      divisions: 100,
+                      label: '\$${_monthlyFee?.toStringAsFixed(2) ?? '0.00'}',
+                      onChanged: (value) {
+                        setState(() {
+                          _monthlyFee = value;
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 32),
+              
+              // Create Button
+              SizedBox(
+                width: double.infinity,
+                child: AppButton(
+                  text: _isLoading ? 'Creating Team...' : 'Create Team',
+                  onPressed: _isLoading ? null : _createTeam,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

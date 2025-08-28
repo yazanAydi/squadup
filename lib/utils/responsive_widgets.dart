@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../core/theme/app_colors.dart';
 import 'responsive_utils.dart';
 
 /// Responsive sport card widget that automatically adjusts to screen size
@@ -49,7 +50,7 @@ class ResponsiveSportCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(ResponsiveUtils.getResponsiveBorderRadius(context)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
+            color: AppColors.outline.withValues(alpha: 0.1),
             blurRadius: ResponsiveUtils.getResponsiveShadowBlurRadius(context),
             offset: ResponsiveUtils.getResponsiveShadowOffset(context),
           ),
@@ -74,9 +75,7 @@ class ResponsiveSportCard extends StatelessWidget {
           // Sport name
           Text(
             sport,
-            style: TextStyle(
-              color: Theme.of(context).textTheme.bodyLarge?.color ?? Colors.white,
-              fontSize: ResponsiveUtils.getResponsiveFontSize(context, small: 11, medium: 13),
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
               fontWeight: FontWeight.w600,
             ),
             textAlign: TextAlign.center,
@@ -87,9 +86,8 @@ class ResponsiveSportCard extends StatelessWidget {
           // Position
           Text(
             position,
-            style: TextStyle(
-              color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.7) ?? Colors.grey,
-              fontSize: ResponsiveUtils.getResponsiveFontSize(context, small: 9, medium: 11),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
             ),
             textAlign: TextAlign.center,
             overflow: TextOverflow.ellipsis,
@@ -108,7 +106,7 @@ class ResponsiveSportCard extends StatelessWidget {
                   IconButton(
                     icon: Icon(
                       Icons.edit,
-                      color: Theme.of(context).iconTheme.color ?? Colors.white,
+                      color: Theme.of(context).iconTheme.color,
                       size: ResponsiveUtils.getResponsiveIconSize(context, small: 14, medium: 16),
                     ),
                     padding: EdgeInsets.zero,
@@ -126,7 +124,7 @@ class ResponsiveSportCard extends StatelessWidget {
                   IconButton(
                     icon: Icon(
                       Icons.delete,
-                      color: Colors.redAccent,
+                      color: AppColors.red,
                       size: ResponsiveUtils.getResponsiveIconSize(context, small: 14, medium: 16),
                     ),
                     padding: EdgeInsets.zero,
@@ -213,9 +211,7 @@ class ResponsiveTeamCard extends StatelessWidget {
                       children: [
                         Text(
                           team['name'] ?? 'Team Name',
-                          style: TextStyle(
-                            color: Theme.of(context).textTheme.headlineSmall?.color ?? Colors.white,
-                            fontSize: ResponsiveUtils.getResponsiveFontSize(context, small: 18, medium: 24),
+                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                           overflow: TextOverflow.ellipsis,
@@ -223,9 +219,8 @@ class ResponsiveTeamCard extends StatelessWidget {
                         ),
                         Text(
                           team['sport'] ?? 'Sport',
-                          style: TextStyle(
-                            color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.7) ?? Colors.grey,
-                            fontSize: ResponsiveUtils.getResponsiveFontSize(context, small: 14, medium: 16),
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                           ),
                         ),
                       ],
@@ -247,18 +242,15 @@ class ResponsiveTeamCard extends StatelessWidget {
                 SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context) * 1.5),
                 Text(
                   'About',
-                  style: TextStyle(
-                    color: Theme.of(context).textTheme.titleMedium?.color ?? Colors.white,
-                    fontSize: ResponsiveUtils.getResponsiveFontSize(context, small: 16, medium: 18),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context)),
                 Text(
                   team['description'],
-                  style: TextStyle(
-                    color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.8) ?? Colors.grey,
-                    fontSize: ResponsiveUtils.getResponsiveFontSize(context, small: 14, medium: 16),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
                     height: 1.5,
                   ),
                   maxLines: 3,
@@ -275,8 +267,8 @@ class ResponsiveTeamCard extends StatelessWidget {
                     child: ElevatedButton(
                       onPressed: isOwner ? onManage : onJoin,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).primaryColor,
-                        foregroundColor: Colors.white,
+                        backgroundColor: Theme.of(context).colorScheme.primary,
+                        foregroundColor: Theme.of(context).colorScheme.onPrimary,
                         padding: EdgeInsets.symmetric(
                           vertical: ResponsiveUtils.getResponsiveButtonHeight(context) * 0.3,
                         ),
@@ -286,8 +278,7 @@ class ResponsiveTeamCard extends StatelessWidget {
                       ),
                       child: Text(
                         isOwner ? 'Manage Team' : 'Request to Join',
-                        style: TextStyle(
-                          fontSize: ResponsiveUtils.getResponsiveFontSize(context, small: 14, medium: 16),
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -309,19 +300,15 @@ class ResponsiveTeamCard extends StatelessWidget {
         children: [
           Text(
             '$label: ',
-            style: TextStyle(
-              color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.7) ?? Colors.grey,
-              fontSize: ResponsiveUtils.getResponsiveFontSize(context, small: 12, medium: 14),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
               fontWeight: FontWeight.w500,
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: TextStyle(
-                color: Theme.of(context).textTheme.bodyMedium?.color ?? Colors.white,
-                fontSize: ResponsiveUtils.getResponsiveFontSize(context, small: 12, medium: 14),
-              ),
+              style: Theme.of(context).textTheme.bodySmall,
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -408,9 +395,7 @@ class ResponsiveGameCard extends StatelessWidget {
                       children: [
                         Text(
                           game['title'] ?? 'Game Title',
-                          style: TextStyle(
-                            color: Theme.of(context).textTheme.headlineSmall?.color ?? Colors.white,
-                            fontSize: ResponsiveUtils.getResponsiveFontSize(context, small: 18, medium: 24),
+                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                           overflow: TextOverflow.ellipsis,
@@ -418,9 +403,8 @@ class ResponsiveGameCard extends StatelessWidget {
                         ),
                         Text(
                           game['sport'] ?? 'Sport',
-                          style: TextStyle(
-                            color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.7) ?? Colors.grey,
-                            fontSize: ResponsiveUtils.getResponsiveFontSize(context, small: 14, medium: 16),
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                           ),
                         ),
                       ],
@@ -443,18 +427,15 @@ class ResponsiveGameCard extends StatelessWidget {
                 SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context) * 1.5),
                 Text(
                   'About',
-                  style: TextStyle(
-                    color: Theme.of(context).textTheme.titleMedium?.color ?? Colors.white,
-                    fontSize: ResponsiveUtils.getResponsiveFontSize(context, small: 16, medium: 18),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context)),
                 Text(
                   game['description'],
-                  style: TextStyle(
-                    color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.8) ?? Colors.grey,
-                    fontSize: ResponsiveUtils.getResponsiveFontSize(context, small: 14, medium: 16),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
                     height: 1.5,
                   ),
                   maxLines: 3,
@@ -471,8 +452,8 @@ class ResponsiveGameCard extends StatelessWidget {
                   child: ElevatedButton(
                     onPressed: onJoin,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Theme.of(context).primaryColor,
-                      foregroundColor: Colors.white,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
                       padding: EdgeInsets.symmetric(
                         vertical: ResponsiveUtils.getResponsiveButtonHeight(context) * 0.3,
                       ),
@@ -482,8 +463,7 @@ class ResponsiveGameCard extends StatelessWidget {
                     ),
                     child: Text(
                       'Join Game',
-                      style: TextStyle(
-                        fontSize: ResponsiveUtils.getResponsiveFontSize(context, small: 14, medium: 16),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -503,19 +483,15 @@ class ResponsiveGameCard extends StatelessWidget {
         children: [
           Text(
             '$label: ',
-            style: TextStyle(
-              color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.7) ?? Colors.grey,
-              fontSize: ResponsiveUtils.getResponsiveFontSize(context, small: 12, medium: 14),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
               fontWeight: FontWeight.w500,
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: TextStyle(
-                color: Theme.of(context).textTheme.bodyMedium?.color ?? Colors.white,
-                fontSize: ResponsiveUtils.getResponsiveFontSize(context, small: 12, medium: 14),
-              ),
+              style: Theme.of(context).textTheme.bodySmall,
               overflow: TextOverflow.ellipsis,
             ),
           ),

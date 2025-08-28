@@ -10,6 +10,10 @@ import '../../services/interfaces/game_service_interface.dart';
 import '../../services/implementations/user_service.dart';
 import '../../services/implementations/team_service.dart';
 import '../../services/implementations/game_service.dart';
+import '../../services/repositories/user_repository.dart';
+import '../../services/repositories/team_repository.dart';
+import '../../services/repositories/game_repository.dart';
+import '../../services/interfaces/base_repository.dart';
 import '../../controllers/user_profile_controller.dart';
 import '../../controllers/auth_controller.dart';
 import '../../controllers/team_controller.dart';
@@ -17,6 +21,8 @@ import '../../controllers/game_feed_controller.dart';
 import '../../models/user_profile.dart';
 import '../../models/team.dart';
 import '../../models/game.dart';
+import '../../utils/cache_manager.dart';
+import '../../core/security/rate_limiter.dart';
 
 // Firebase Core Provider
 final firebaseCoreProvider = Provider<FirebaseApp>((ref) {
@@ -38,17 +44,49 @@ final firebaseStorageProvider = Provider<FirebaseStorage>((ref) {
   return FirebaseStorage.instance;
 });
 
-// User Service Provider
-final userServiceProvider = Provider<UserServiceInterface>((ref) {
-  return UserService();
+// Cache Manager Provider
+final cacheManagerProvider = Provider<CacheManager>((ref) {
+  return CacheManager();
 });
 
-// Team Service Provider
+// Rate Limiter Provider
+final rateLimiterProvider = Provider<RateLimiter>((ref) {
+  return RateLimiter();
+});
+
+// Repository Providers
+final userRepositoryProvider = Provider<UserRepository>((ref) {
+  final firestore = ref.watch(firebaseFirestoreProvider);
+  final auth = ref.watch(firebaseAuthProvider);
+  return UserRepository(firestore: firestore, auth: auth);
+});
+
+final teamRepositoryProvider = Provider<BaseRepository<Team>>((ref) {
+  final firestore = ref.watch(firebaseFirestoreProvider);
+  return TeamRepository(firestore: firestore);
+});
+
+final gameRepositoryProvider = Provider<BaseRepository<Game>>((ref) {
+  final firestore = ref.watch(firebaseFirestoreProvider);
+  return GameRepository(firestore: firestore);
+});
+
+// Service Providers
+final userServiceProvider = Provider<UserServiceInterface>((ref) {
+  final userRepository = ref.watch(userRepositoryProvider);
+  final cacheManager = ref.watch(cacheManagerProvider);
+  final rateLimiter = ref.watch(rateLimiterProvider);
+  return UserService(
+    userRepository: userRepository,
+    cacheManager: cacheManager,
+    rateLimiter: rateLimiter,
+  );
+});
+
 final teamServiceProvider = Provider<TeamServiceInterface>((ref) {
   return TeamService();
 });
 
-// Game Service Provider
 final gameServiceProvider = Provider<GameServiceInterface>((ref) {
   return GameService();
 });
@@ -65,7 +103,7 @@ final userIdProvider = Provider<String?>((ref) {
   return userAsync.when(
     data: (user) => user?.uid,
     loading: () => null,
-    error: (_, __) => null,
+    error: (error, stackTrace) => null,
   );
 });
 
@@ -75,7 +113,7 @@ final authStateProvider = Provider<AuthState>((ref) {
   return userAsync.when(
     data: (user) => user != null ? AuthState.authenticated : AuthState.unauthenticated,
     loading: () => AuthState.loading,
-    error: (_, __) => AuthState.error,
+    error: (error, stackTrace) => AuthState.error,
   );
 });
 
@@ -126,4 +164,26 @@ final userTeamsProvider = Provider<AsyncValue<List<Team>>>((ref) {
 
 final gameFeedProvider = Provider<AsyncValue<List<Game>>>((ref) {
   return ref.watch(gameFeedControllerProvider);
+});
+
+// Cache and Performance Providers
+final cacheStatsProvider = Provider<Map<String, dynamic>>((ref) {
+  final cacheManager = ref.watch(cacheManagerProvider);
+  return cacheManager.getStats();
+});
+
+final rateLimitStatsProvider = Provider<Map<String, dynamic>>((ref) {
+  final rateLimiter = ref.watch(rateLimiterProvider);
+  return rateLimiter.getStats();
+});
+
+// Provider for managing cache cleanup
+final cacheCleanupProvider = Provider<Future<void> Function()>((ref) {
+  final cacheManager = ref.watch(cacheManagerProvider);
+  final rateLimiter = ref.watch(rateLimiterProvider);
+  
+  return () async {
+    await cacheManager.cleanup();
+    rateLimiter.cleanup();
+  };
 });

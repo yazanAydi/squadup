@@ -14,6 +14,7 @@ class AppLocalizations {
 
   static const List<Locale> supportedLocales = [
     Locale('en'),
+    Locale('ar'),
     Locale('es'),
   ];
 
@@ -65,6 +66,30 @@ class AppLocalizations {
       'soccer': 'Soccer',
       'tennis': 'Tennis',
       'volleyball': 'Volleyball',
+    },
+    'ar': {
+      'appTitle': 'سكواد أب',
+      'findTeams': 'البحث عن الفرق',
+      'searchTeams': 'البحث عن الفرق...',
+      'noTeamsFound': 'لم يتم العثور على فرق',
+      'tryAdjustingSearch': 'حاول تعديل البحث أو الفلاتر',
+      'teamDetails': 'تفاصيل الفريق',
+      'teamInformation': 'معلومات الفريق',
+      'joinTeam': 'انضم للفريق',
+      'location': 'الموقع',
+      'sport': 'الرياضة',
+      'members': 'الأعضاء',
+      'created': 'تم الإنشاء',
+      'unknown': 'غير معروف',
+      'unknownLocation': 'موقع غير معروف',
+      'players': 'لاعبين',
+      'errorLoadingTeams': 'خطأ في تحميل الفرق',
+      'all': 'الكل',
+      'basketball': 'كرة السلة',
+      'football': 'كرة القدم الأمريكية',
+      'soccer': 'كرة القدم',
+      'tennis': 'التنس',
+      'volleyball': 'الكرة الطائرة',
     },
     'es': {
       'appTitle': 'SquadUp',

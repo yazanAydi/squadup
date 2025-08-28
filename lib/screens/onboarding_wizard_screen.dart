@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../utils/page_transitions.dart';
 import '../utils/safe_text.dart';
+import '../utils/cache_manager.dart';
 import 'home_screen.dart';
 
 class OnboardingWizardScreen extends StatefulWidget {
@@ -16,7 +17,6 @@ class OnboardingWizardScreen extends StatefulWidget {
 
 class _OnboardingWizardScreenState extends State<OnboardingWizardScreen>
     with TickerProviderStateMixin {
-  late PageController _pageController;
   late AnimationController _fadeController;
   late AnimationController _slideController;
   
@@ -39,6 +39,7 @@ class _OnboardingWizardScreenState extends State<OnboardingWizardScreen>
   String _skillLevel = 'Beginner';
   String _location = '';
   final List<String> _goals = [];
+  String _selectedLanguage = 'en'; // Default to English
 
   int _currentStep = 0;
   bool _isLoading = false;
@@ -57,11 +58,14 @@ class _OnboardingWizardScreenState extends State<OnboardingWizardScreen>
     'Stay active', 'Have fun', 'Network professionally'
   ];
 
+  final Map<String, String> _languageOptions = {
+    'en': 'English',
+    'ar': 'العربية',
+  };
+
   @override
   void initState() {
     super.initState();
-    
-    _pageController = PageController();
     
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 600),
@@ -100,19 +104,14 @@ class _OnboardingWizardScreenState extends State<OnboardingWizardScreen>
 
   @override
   void dispose() {
-    _pageController.dispose();
     _fadeController.dispose();
     _slideController.dispose();
     super.dispose();
   }
 
   void _nextStep() {
-    if (_currentStep < 4) {
+    if (_currentStep < 5) {
       setState(() => _currentStep++);
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
       _startAnimation();
     }
   }
@@ -120,10 +119,6 @@ class _OnboardingWizardScreenState extends State<OnboardingWizardScreen>
   void _previousStep() {
     if (_currentStep > 0) {
       setState(() => _currentStep--);
-      _pageController.previousPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
       _startAnimation();
     }
   }
@@ -153,7 +148,9 @@ class _OnboardingWizardScreenState extends State<OnboardingWizardScreen>
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            backgroundColor: Colors.red,
+            backgroundColor: Theme.of(context).colorScheme.error, // Use theme error color
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
       }
@@ -208,6 +205,40 @@ class _OnboardingWizardScreenState extends State<OnboardingWizardScreen>
     );
   }
 
+  Future<void> _requestLocationPermission() async {
+    try {
+      // For now, we'll just show a message since we don't have geolocation package
+      // In a real app, you'd use geolocator or similar package
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: SafeBodyText(
+              'Location permission would be requested here. For now, please enter your location manually.',
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+            ),
+            backgroundColor: Theme.of(context).colorScheme.primary, // #8B5CF6
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: SafeBodyText(
+              'Error requesting location permission: ${e.toString()}',
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+            ),
+            backgroundColor: Theme.of(context).colorScheme.error, // Use theme error color
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _completeOnboarding() async {
     setState(() => _isLoading = true);
 
@@ -220,18 +251,23 @@ class _OnboardingWizardScreenState extends State<OnboardingWizardScreen>
           .collection('users')
           .doc(user.uid)
           .set({
-        'username': _displayName,
-        'profilePicUrl': _photoURL,
+        'displayName': _displayName,
+        'photoURL': _photoURL,
         'sports': _selectedSports,
-        'level': _skillLevel,
+        'skillLevel': _skillLevel,
         'city': _location,
         'goals': _goals,
-        'onboardingCompleted': true,
-        'onboardingCompletedAt': Timestamp.now(),
+        'preferredLanguage': _selectedLanguage,
+        'isOnboardingCompleted': true,
         'createdAt': Timestamp.now(),
-        'uid': user.uid,
+        'updatedAt': Timestamp.now(),
+        'id': user.uid,
         'email': user.email,
       }, SetOptions(merge: true));
+
+      // Clear user cache to ensure fresh data on next sign-in
+      final cacheManager = CacheManager();
+      await cacheManager.remove(CacheKeys.userProfileKey(user.uid));
 
       if (mounted) {
         Navigator.of(context).pushReplacement(
@@ -249,7 +285,7 @@ class _OnboardingWizardScreenState extends State<OnboardingWizardScreen>
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            backgroundColor: Colors.red,
+            backgroundColor: Theme.of(context).colorScheme.error, // Use theme error color
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
@@ -267,7 +303,7 @@ class _OnboardingWizardScreenState extends State<OnboardingWizardScreen>
         vertical: MediaQuery.of(context).size.height * 0.01,
       ),
       child: Row(
-        children: List.generate(5, (index) {
+        children: List.generate(6, (index) {
           final isActive = index == _currentStep;
           final isCompleted = index < _currentStep;
           
@@ -276,13 +312,13 @@ class _OnboardingWizardScreenState extends State<OnboardingWizardScreen>
               margin: EdgeInsets.symmetric(
                 horizontal: MediaQuery.of(context).size.width * 0.01,
               ),
-              height: MediaQuery.of(context).size.height * 0.005,
+              height: 4,
               decoration: BoxDecoration(
-                color: isCompleted 
-                    ? Theme.of(context).colorScheme.primary 
-                    : isActive 
-                        ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.6)
-                        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2),
+                color: isActive 
+                  ? Theme.of(context).colorScheme.primary // #8B5CF6
+                  : isCompleted 
+                    ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.7)
+                    : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2), // #A1A1AA with opacity
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -297,12 +333,14 @@ class _OnboardingWizardScreenState extends State<OnboardingWizardScreen>
       case 0:
         return _buildWelcomeStep();
       case 1:
-        return _buildProfileStep();
+        return _buildLanguageStep();
       case 2:
-        return _buildSportsStep();
+        return _buildProfileStep();
       case 3:
-        return _buildLocationStep();
+        return _buildSportsStep();
       case 4:
+        return _buildLocationStep();
+      case 5:
         return _buildGoalsStep();
       default:
         return const SizedBox.shrink();
@@ -315,14 +353,85 @@ class _OnboardingWizardScreenState extends State<OnboardingWizardScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          // Icon with proper SquadUp primary color
+          Container(
+            width: MediaQuery.of(context).size.width * 0.25,
+            height: MediaQuery.of(context).size.width * 0.25,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary, // #8B5CF6
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.emoji_emotions,
+              size: MediaQuery.of(context).size.width * 0.15,
+              color: Colors.white, // #FFFFFF
+            ),
+          ),
+          SizedBox(height: MediaQuery.of(context).size.height * 0.03),
+          SafeTitleText(
+            'Let\'s Get You Set Up!',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface, // #FFFFFF
+              fontSize: MediaQuery.of(context).size.width * 0.07,
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+          ),
+          SizedBox(height: MediaQuery.of(context).size.height * 0.02),
+          SafeBodyText(
+            'We\'ll help you create your perfect sports profile in just a few steps.',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7), // #A1A1AA
+              fontSize: MediaQuery.of(context).size.width * 0.04,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 3,
+          ),
+          SizedBox(height: MediaQuery.of(context).size.height * 0.05),
+          // Next button with proper SquadUp theming
+          SizedBox(
+            width: double.infinity,
+            height: MediaQuery.of(context).size.height * 0.07,
+            child: ElevatedButton(
+              onPressed: _nextStep,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.primary, // #8B5CF6
+                foregroundColor: Colors.white, // #FFFFFF
+                elevation: 8,
+                shadowColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16), // SquadUp rule: 16px radius
+                ),
+              ),
+              child: Text(
+                'Next',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  letterSpacing: 1,
+                  color: Colors.white, // #FFFFFF
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLanguageStep() {
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.05),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
           Icon(
-            Icons.emoji_emotions,
+            Icons.language,
             size: MediaQuery.of(context).size.width * 0.2,
             color: Theme.of(context).colorScheme.primary,
           ),
           SizedBox(height: MediaQuery.of(context).size.height * 0.03),
           SafeTitleText(
-            'Let\'s Get You Set Up!',
+            'Choose Your Language',
             style: TextStyle(
               color: Theme.of(context).colorScheme.onSurface,
               fontSize: MediaQuery.of(context).size.width * 0.07,
@@ -337,7 +446,7 @@ class _OnboardingWizardScreenState extends State<OnboardingWizardScreen>
               horizontal: MediaQuery.of(context).size.width * 0.1,
             ),
             child: SafeBodyText(
-              'We\'ll help you create your perfect sports profile in just a few steps.',
+              'Select your preferred language for the app',
               style: TextStyle(
                 color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                 fontSize: MediaQuery.of(context).size.width * 0.04,
@@ -347,6 +456,60 @@ class _OnboardingWizardScreenState extends State<OnboardingWizardScreen>
               maxLines: 4,
             ),
           ),
+          SizedBox(height: MediaQuery.of(context).size.height * 0.04),
+          
+          // Language Options
+          ..._languageOptions.entries.map((entry) {
+            final languageCode = entry.key;
+            final languageName = entry.value;
+            final isSelected = _selectedLanguage == languageCode;
+            
+            return Container(
+              margin: EdgeInsets.only(
+                bottom: MediaQuery.of(context).size.height * 0.02,
+              ),
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _selectedLanguage = languageCode;
+                  });
+                },
+                child: Container(
+                  padding: EdgeInsets.all(
+                    MediaQuery.of(context).size.width * 0.04,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isSelected ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isSelected ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isSelected ? Icons.check_circle : Icons.circle_outlined,
+                        color: isSelected ? Theme.of(context).colorScheme.onSurface : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                        size: MediaQuery.of(context).size.width * 0.06,
+                      ),
+                      SizedBox(width: MediaQuery.of(context).size.width * 0.04),
+                      Expanded(
+                        child: SafeBodyText(
+                          languageName,
+                          style: TextStyle(
+                            color: isSelected ? Theme.of(context).colorScheme.onSurface : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                            fontSize: MediaQuery.of(context).size.width * 0.04,
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                          ),
+                          maxLines: 2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
         ],
       ),
     );
@@ -477,11 +640,11 @@ class _OnboardingWizardScreenState extends State<OnboardingWizardScreen>
           
           Expanded(
             child: GridView.builder(
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
+              gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: MediaQuery.of(context).size.width > 600 ? 200 : 150,
                 crossAxisSpacing: MediaQuery.of(context).size.width * 0.03,
                 mainAxisSpacing: MediaQuery.of(context).size.height * 0.015,
-                childAspectRatio: MediaQuery.of(context).size.width > 600 ? 3.0 : 2.5,
+                childAspectRatio: 1.2,
               ),
               itemCount: _availableSports.length,
               itemBuilder: (context, index) {
@@ -585,7 +748,7 @@ class _OnboardingWizardScreenState extends State<OnboardingWizardScreen>
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          backgroundColor: Colors.red,
+          backgroundColor: Theme.of(context).colorScheme.error, // Use theme error color
         ),
       );
       return;
@@ -657,7 +820,7 @@ class _OnboardingWizardScreenState extends State<OnboardingWizardScreen>
           ),
           SizedBox(height: MediaQuery.of(context).size.height * 0.02),
           SafeBodyText(
-            'This helps us find games and teams near you',
+            'This helps us find games and teams near you. You can also use your current location.',
             style: TextStyle(
               color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
               fontSize: MediaQuery.of(context).size.width * 0.04,
@@ -666,6 +829,45 @@ class _OnboardingWizardScreenState extends State<OnboardingWizardScreen>
             maxLines: 3,
           ),
           SizedBox(height: MediaQuery.of(context).size.height * 0.03),
+          
+          // Location Permission Button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                _requestLocationPermission();
+              },
+              icon: Icon(Icons.my_location, color: Theme.of(context).colorScheme.onSurface),
+              label: SafeButtonText(
+                'Use Current Location',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontSize: MediaQuery.of(context).size.width * 0.04,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                foregroundColor: Theme.of(context).colorScheme.primary,
+                padding: EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+          
+          SizedBox(height: MediaQuery.of(context).size.height * 0.03),
+          
+          SafeBodyText(
+            'Or enter manually:',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              fontSize: MediaQuery.of(context).size.width * 0.035,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          
+          SizedBox(height: MediaQuery.of(context).size.height * 0.02),
           
           Container(
             decoration: BoxDecoration(
@@ -831,7 +1033,7 @@ class _OnboardingWizardScreenState extends State<OnboardingWizardScreen>
                         ),
                       Expanded(
                         child: SafeTitleText(
-                          'Step ${_currentStep + 1} of 5',
+                          'Step ${_currentStep + 1} of 6',
                           style: TextStyle(
                             color: Theme.of(context).colorScheme.onSurface,
                             fontSize: MediaQuery.of(context).size.width * 0.045,
@@ -893,7 +1095,7 @@ class _OnboardingWizardScreenState extends State<OnboardingWizardScreen>
                       
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: _currentStep == 4 
+                          onPressed: _currentStep == 5 
                               ? (_isLoading ? null : _completeOnboarding)
                               : _nextStep,
                           style: ElevatedButton.styleFrom(
@@ -916,7 +1118,7 @@ class _OnboardingWizardScreenState extends State<OnboardingWizardScreen>
                                   ),
                                 )
                               : SafeButtonText(
-                                  _currentStep == 4 ? 'Complete Setup' : 'Next',
+                                  _currentStep == 5 ? 'Complete Setup' : 'Next',
                                   style: TextStyle(
                                     fontSize: MediaQuery.of(context).size.width * 0.04,
                                     fontWeight: FontWeight.bold,

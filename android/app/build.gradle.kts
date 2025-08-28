@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
-    id("com.google.gms.google-services") // Firebase
+    id("com.google.gms.google-services")
+    id("com.google.firebase.crashlytics") // Firebase
     id("kotlin-android")
     id("dev.flutter.flutter-gradle-plugin") // Flutter plugin last
 }
@@ -13,7 +14,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.squadup"
-        minSdk = 23
+        minSdk = 24
         targetSdk = 35
         versionCode = 1
         versionName = "1.0.0"
@@ -22,6 +23,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -41,5 +43,6 @@ flutter {
 }
 dependencies {
     implementation("androidx.appcompat:appcompat:1.6.1")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/app_colors.dart';
 
 class AppCard extends StatelessWidget {
   final Widget child;
@@ -44,7 +45,7 @@ class AppCard extends StatelessWidget {
         ),
         boxShadow: boxShadow ?? [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
+            color: AppColors.outline.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),

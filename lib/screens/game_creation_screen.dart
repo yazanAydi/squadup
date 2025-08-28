@@ -1,1071 +1,840 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:image_picker/image_picker.dart';
-import 'dart:io';
-import '../services/image_uploader.dart';
+import '../models/game.dart';
+import '../services/service_locator.dart';
+import '../widgets/common/app_button.dart';
+import '../widgets/common/app_card.dart';
+import '../widgets/modern_input_field.dart';
 
-class GameCreationScreen extends StatefulWidget {
+class GameCreationScreen extends ConsumerStatefulWidget {
   const GameCreationScreen({super.key});
 
   @override
-  State<GameCreationScreen> createState() => _GameCreationScreenState();
+  ConsumerState<GameCreationScreen> createState() => _GameCreationScreenState();
 }
 
-class _GameCreationScreenState extends State<GameCreationScreen>
-    with TickerProviderStateMixin {
-  late AnimationController _formController;
-  late Animation<Offset> _formSlide;
-  late Animation<double> _formFade;
-
+class _GameCreationScreenState extends ConsumerState<GameCreationScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _gameNameController = TextEditingController();
-  final _locationController = TextEditingController();
+  final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _maxPlayersController = TextEditingController();
-
-  String _selectedSport = 'Basketball';
-  String _selectedGameType = 'Pickup';
-  String _selectedLevel = 'Mixed';
-  String _selectedLocation = 'Indoor';
-  DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
-  TimeOfDay _selectedTime = TimeOfDay.now();
+  final _rulesController = TextEditingController();
+  final _venueNameController = TextEditingController();
+  final _venueDetailsController = TextEditingController();
+  
+  DateTime _scheduledDate = DateTime.now().add(const Duration(days: 1));
+  TimeOfDay _scheduledTime = const TimeOfDay(hour: 18, minute: 0);
+  int _durationHours = 2;
+  
+  String _selectedSport = 'Football';
+  String _selectedSkillLevel = 'Beginner';
+  String _selectedCurrency = 'USD';
+  
+  int _maxPlayers = 10;
+  int _minPlayers = 6;
+  double _price = 0.0;
+  
+  final List<String> _rules = [];
+  final List<String> _tags = [];
+  
   bool _isPrivate = false;
-  bool _isFree = true;
-  double _entryFee = 0.0;
-  bool _isLoading = false;
-  String? _posterBackgroundUrl;
-
-  // THEME
-  static const Color bg = Color(0xFF0A0A0A);
-  static const Color card = Color(0xFF1A1A1A);
-  static const Color accent = Color(0xFF8C6CFF);
-  static const Color subtle = Color(0xFF6B7280);
-
-  List<String> sports = ['Basketball', 'Soccer', 'Volleyball', 'Tennis', 'Badminton'];
-  List<String> gameTypes = ['Pickup', 'Scheduled', 'Tournament', 'League'];
-  List<String> levels = ['Beginner', 'Intermediate', 'Advanced', 'Mixed'];
-  List<String> locations = ['Indoor', 'Outdoor', 'Both'];
+  bool _requiresCheckIn = false;
+  DateTime? _checkInDeadline;
+  
+  GameLocation? _location;
+  bool _isLoadingLocation = false;
+  bool _isCreatingGame = false;
+  
+  final List<String> _availableSports = [
+    'Football', 'Basketball', 'Tennis', 'Volleyball', 'Baseball',
+    'Soccer', 'Hockey', 'Cricket', 'Rugby', 'Badminton',
+    'Table Tennis', 'Golf', 'Swimming', 'Running', 'Cycling',
+    'Other'
+  ];
+  
+  final List<String> _skillLevels = [
+    'Beginner', 'Intermediate', 'Advanced', 'Professional', 'All Levels'
+  ];
+  
+  final List<String> _currencies = ['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD'];
 
   @override
   void initState() {
     super.initState();
-    
-    _formController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
-
-    _formSlide = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _formController,
-      curve: Curves.easeOutCubic,
-    ));
-
-    _formFade = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _formController,
-      curve: Curves.easeIn,
-    ));
-
-    _formController.forward();
+    _getCurrentLocation();
   }
 
   @override
   void dispose() {
-    _formController.dispose();
-    _gameNameController.dispose();
-    _locationController.dispose();
+    _titleController.dispose();
     _descriptionController.dispose();
-    _maxPlayersController.dispose();
+    _rulesController.dispose();
+    _venueNameController.dispose();
+    _venueDetailsController.dispose();
     super.dispose();
   }
 
-  String _getSportIcon(String sport) {
-    switch (sport.toLowerCase()) {
-      case 'basketball':
-        return 'assets/basketball.png';
-      case 'soccer':
-        return 'assets/ball.png';
-      case 'volleyball':
-        return 'assets/volleyball.png';
-      default:
-        return 'assets/basketball.png';
+  Future<void> _getCurrentLocation() async {
+    setState(() {
+      _isLoadingLocation = true;
+    });
+
+    try {
+      // Check permissions
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          _showLocationError('Location permission denied');
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        _showLocationError('Location permissions are permanently denied');
+        return;
+      }
+
+      // Get current position
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+
+      // Create location with coordinates
+      // Note: Address geocoding requires additional packages like 'geocoding'
+      // For now, we'll use coordinates and let users manually input address details
+      _location = GameLocation(
+        latitude: position.latitude,
+        longitude: position.longitude,
+        address: 'Current Location (${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)})',
+        city: '',
+        state: '',
+        country: '',
+      );
+    } catch (e) {
+      _showLocationError('Failed to get location: $e');
+    } finally {
+      setState(() {
+        _isLoadingLocation = false;
+      });
     }
   }
 
-  Future<void> _selectDate() async {
-    final DateTime? picked = await showDatePicker(
+  void _showLocationError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _addRule() {
+    if (_rulesController.text.trim().isNotEmpty) {
+      setState(() {
+        _rules.add(_rulesController.text.trim());
+        _rulesController.clear();
+      });
+    }
+  }
+
+  void _removeRule(int index) {
+    setState(() {
+      _rules.removeAt(index);
+    });
+  }
+
+  void _addTag() {
+    // Add common tags based on sport
+    final sportTags = {
+      'Football': ['5v5', 'Indoor', 'Outdoor', 'Competitive', 'Casual'],
+      'Basketball': ['3v3', '5v5', 'Indoor', 'Outdoor', 'Streetball'],
+      'Tennis': ['Singles', 'Doubles', 'Indoor', 'Outdoor', 'Clay', 'Hard'],
+      'Volleyball': ['6v6', 'Beach', 'Indoor', 'Competitive', 'Recreational'],
+      'Baseball': ['9v9', 'Indoor', 'Outdoor', 'Competitive', 'Recreational'],
+    };
+
+    final availableTags = sportTags[_selectedSport] ?? ['Competitive', 'Recreational', 'Training'];
+    
+    showDialog(
       context: context,
-      initialDate: _selectedDate,
+      builder: (context) => AlertDialog(
+        title: const Text('Add Tags'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: availableTags.map((tag) {
+            return CheckboxListTile(
+              title: Text(tag),
+              value: _tags.contains(tag),
+              onChanged: (value) {
+                setState(() {
+                  if (value == true) {
+                    _tags.add(tag);
+                  } else {
+                    _tags.remove(tag);
+                  }
+                });
+              },
+            );
+          }).toList(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Done'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _selectDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _scheduledDate,
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365)),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.dark(
-              primary: accent,
-              onPrimary: Theme.of(context).colorScheme.onSurface,
-              surface: card,
-              onSurface: Theme.of(context).colorScheme.onSurface,
-            ),
-            dialogTheme: DialogThemeData(
-              backgroundColor: bg,
-            ),
-          ),
-          child: child!,
-        );
-      },
     );
-    if (picked != null && picked != _selectedDate) {
+    if (picked != null) {
       setState(() {
-        _selectedDate = picked;
+        _scheduledDate = picked;
       });
     }
   }
 
   Future<void> _selectTime() async {
-    final TimeOfDay? picked = await showTimePicker(
+    final picked = await showTimePicker(
       context: context,
-      initialTime: _selectedTime,
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.dark(
-              primary: accent,
-              onPrimary: Theme.of(context).colorScheme.onSurface,
-              surface: card,
-              onSurface: Theme.of(context).colorScheme.onSurface,
-            ),
-            dialogTheme: DialogThemeData(
-              backgroundColor: bg,
-            ),
-          ),
-          child: child!,
-        );
-      },
+      initialTime: _scheduledTime,
     );
-    if (picked != null && picked != _selectedTime) {
+    if (picked != null) {
       setState(() {
-        _selectedTime = picked;
+        _scheduledTime = picked;
       });
     }
   }
 
-  // Show image picker for poster background selection
-  Future<void> _showPosterPicker() async {
-    final ImagePicker picker = ImagePicker();
-    final navigator = Navigator.of(context);
-    
-    try {
-      final XFile? image = await showDialog<XFile>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Choose Poster Background'),
-          content: const Text('Select an image from your device'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () async {
-                final XFile? pickedImage = await picker.pickImage(
-                  source: ImageSource.gallery,
-                  maxWidth: 1024,
-                  maxHeight: 1024,
-                  imageQuality: 80,
-                );
-                if (mounted) {
-                  navigator.pop(pickedImage);
-                }
-              },
-              child: const Text('Gallery'),
-            ),
-            TextButton(
-              onPressed: () async {
-                final XFile? pickedImage = await picker.pickImage(
-                  source: ImageSource.camera,
-                  maxWidth: 1024,
-                  maxHeight: 1024,
-                  imageQuality: 80,
-                );
-                if (mounted) {
-                  navigator.pop(pickedImage);
-                }
-              },
-              child: const Text('Camera'),
-            ),
-          ],
+  Future<void> _selectCheckInDeadline() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _checkInDeadline ?? _scheduledDate,
+      firstDate: DateTime.now(),
+      lastDate: _scheduledDate,
+    );
+    if (picked != null) {
+      setState(() {
+        _checkInDeadline = picked;
+      });
+    }
+  }
+
+  bool _validateForm() {
+    if (_location == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please set a location for the game'),
+          backgroundColor: Colors.red,
         ),
       );
-      
-      if (image != null) {
-        await _uploadPosterBackground(File(image.path));
-      }
-    } catch (e) {
-      if (mounted) {
-        final messenger = ScaffoldMessenger.of(context);
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text('Error picking image: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      return false;
     }
-  }
-
-  // Handle poster background upload
-  Future<void> _uploadPosterBackground(File imageFile) async {
-    try {
-      setState(() => _isLoading = true);
-      
-      // Upload to Firebase Storage
-      final downloadUrl = await ImageUploader.uploadImage(
-        imageFile,
-        pathPrefix: 'game_posters',
-      );
-      
-      setState(() {
-        _posterBackgroundUrl = downloadUrl;
-        _isLoading = false;
-      });
-      
-      if (mounted) {
-        final messenger = ScaffoldMessenger.of(context);
-        messenger.showSnackBar(
-          const SnackBar(
-            content: Text('Poster background selected successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        final messenger = ScaffoldMessenger.of(context);
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text('Error uploading poster background: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
+    return true;
   }
 
   Future<void> _createGame() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate() || !_validateForm()) {
+      return;
+    }
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isCreatingGame = true;
+    });
 
     try {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
-      if (uid == null) throw Exception('User not authenticated');
-
-      // Combine date and time
-      final gameDateTime = DateTime(
-        _selectedDate.year,
-        _selectedDate.month,
-        _selectedDate.day,
-        _selectedTime.hour,
-        _selectedTime.minute,
+      final scheduledDateTime = DateTime(
+        _scheduledDate.year,
+        _scheduledDate.month,
+        _scheduledDate.day,
+        _scheduledTime.hour,
+        _scheduledTime.minute,
       );
 
-      final gameData = {
-        'name': _gameNameController.text.trim(),
-        'sport': _selectedSport,
-        'gameType': _selectedGameType,
-        'level': _selectedLevel,
-        'location': _locationController.text.trim(),
-        'locationType': _selectedLocation,
-        'description': _descriptionController.text.trim(),
-        'maxPlayers': int.parse(_maxPlayersController.text),
-        'currentPlayers': 1, // Creator is the first player
-        'createdBy': uid,
-        'createdAt': Timestamp.now(),
-        'gameDateTime': Timestamp.fromDate(gameDateTime),
-        'isPrivate': _isPrivate,
-        'isFree': _isFree,
-        'entryFee': _entryFee,
-        'status': 'open', // open, full, cancelled, completed
-        'players': [uid], // Creator is automatically a player
-        'pendingRequests': [],
-        'teams': [], // For team-based games
-        'rules': [], // Custom rules
-        'equipment': [], // Required equipment
-      };
+      final endDateTime = scheduledDateTime.add(Duration(hours: _durationHours));
 
-      final docRef = await FirebaseFirestore.instance.collection('games').add(gameData);
+      final game = Game.create(
+        title: _titleController.text.trim(),
+        description: _descriptionController.text.trim(),
+        scheduledTime: scheduledDateTime,
+        endTime: endDateTime,
+        location: _location!,
+        sport: _selectedSport,
+        skillLevel: _selectedSkillLevel,
+        maxPlayers: _maxPlayers,
+        minPlayers: _minPlayers,
+        price: _price,
+        currency: _selectedCurrency,
+        rules: _rules,
+        createdBy: FirebaseAuth.instance.currentUser?.uid ?? 'anonymous',
+        tags: _tags,
+        isPrivate: _isPrivate,
+        requiresCheckIn: _requiresCheckIn,
+        checkInDeadline: _checkInDeadline,
+      );
 
-      // Add game reference to user's created games
-      await FirebaseFirestore.instance.collection('users').doc(uid).update({
-        'createdGames': FieldValue.arrayUnion([docRef.id]),
-      });
+      // Get game service from service locator
+      final gameService = ServiceLocator.instance.gameService;
+      final gameId = await gameService.createGame(game.toFirestore());
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Game "${_gameNameController.text.trim()}" created successfully!'),
+            content: Text('Game created successfully! ID: $gameId'),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
-        Navigator.pop(context, true); // Return true to indicate success
+        
+        // Navigate back or to game details
+        Navigator.pop(context        );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error creating game: ${e.toString()}'),
+            content: Text('Failed to create game: $e'),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
       }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _isCreatingGame = false;
+        });
+      }
     }
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year}';
-  }
-
-  String _formatTime(TimeOfDay time) {
-    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: bg,
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [bg, Theme.of(context).colorScheme.surface],
-          ),
-        ),
-        child: SafeArea(
+      appBar: AppBar(
+        title: const Text('Create New Game'),
+        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+        foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
+      ),
+      body: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // App Bar
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.arrow_back),
-                    ),
-                    Expanded(
-                      child: Text(
-                        'Create Game',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                    const SizedBox(width: 48), // Balance the back button
-                  ],
-                ),
+              // Basic Information Section
+              _buildSectionHeader('Basic Information'),
+              const SizedBox(height: 16),
+              
+              ModernInputField(
+                controller: _titleController,
+                label: 'Game Title',
+                hint: 'Enter a catchy title for your game',
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Please enter a game title';
+                  }
+                  if (value.trim().length < 3) {
+                    return 'Title must be at least 3 characters long';
+                  }
+                  return null;
+                },
               ),
-
-              // Form
-              Expanded(
-                child: SlideTransition(
-                  position: _formSlide,
-                  child: FadeTransition(
-                    opacity: _formFade,
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(16),
-                      child: Form(
-                        key: _formKey,
+              
+              const SizedBox(height: 16),
+              
+              ModernInputField(
+                controller: _descriptionController,
+                label: 'Description',
+                hint: 'Describe your game, rules, and what to expect',
+                maxLines: 3,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Please enter a description';
+                  }
+                  return null;
+                },
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // Sport & Skill Level Section
+              _buildSectionHeader('Sport & Skill Level'),
+              const SizedBox(height: 16),
+              
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: _selectedSport,
+                      decoration: const InputDecoration(
+                        labelText: 'Sport',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: _availableSports.map((sport) {
+                        return DropdownMenuItem(
+                          value: sport,
+                          child: Text(sport),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedSport = value!;
+                          _tags.clear(); // Clear tags when sport changes
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: _selectedSkillLevel,
+                      decoration: const InputDecoration(
+                        labelText: 'Skill Level',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: _skillLevels.map((level) {
+                        return DropdownMenuItem(
+                          value: level,
+                          child: Text(level),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedSkillLevel = value!;
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // Date & Time Section
+              _buildSectionHeader('Date & Time'),
+              const SizedBox(height: 16),
+              
+              Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      onTap: _selectDate,
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Sport Selection
+                            const Text('Date', style: TextStyle(fontSize: 12, color: Colors.grey)),
                             Text(
-                              'Sport',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.onSurface,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
+                              DateFormat('MMM dd, yyyy').format(_scheduledDate),
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                             ),
-                            const SizedBox(height: 12),
-                            Container(
-                              decoration: BoxDecoration(
-                                color: card.withValues(alpha: 0.8),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
-                              ),
-                              child: DropdownButtonFormField<String>(
-                                value: _selectedSport,
-                                onChanged: (value) => setState(() => _selectedSport = value!),
-                                decoration: const InputDecoration(
-                                  border: InputBorder.none,
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                ),
-                                dropdownColor: card,
-                                style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-                                items: sports.map((sport) {
-                                  return DropdownMenuItem(
-                                    value: sport,
-                                    child: Row(
-                                      children: [
-                                        Image.asset(
-                                          _getSportIcon(sport),
-                                          width: 24,
-                                          height: 24,
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Text(sport),
-                                      ],
-                                    ),
-                                  );
-                                }).toList(),
-                              ),
-                            ),
-                            
-                            const SizedBox(height: 24),
-                            
-                            // Game Type Selection
-                            Text(
-                              'Game Type',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.onSurface,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Container(
-                              decoration: BoxDecoration(
-                                color: card.withValues(alpha: 0.8),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
-                              ),
-                              child: DropdownButtonFormField<String>(
-                                value: _selectedGameType,
-                                onChanged: (value) => setState(() => _selectedGameType = value!),
-                                decoration: const InputDecoration(
-                                  border: InputBorder.none,
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                ),
-                                dropdownColor: card,
-                                style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-                                items: gameTypes.map((type) {
-                                  return DropdownMenuItem(
-                                    value: type,
-                                    child: Text(type),
-                                  );
-                                }).toList(),
-                              ),
-                            ),
-                            
-                            const SizedBox(height: 24),
-                            
-                            // Game Name
-                            Text(
-                              'Game Name',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.onSurface,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Container(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [
-                                    card,
-                                    card.withValues(alpha: 0.8),
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
-                              ),
-                              child: TextFormField(
-                                controller: _gameNameController,
-                                style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-                                validator: (value) {
-                                  if (value == null || value.trim().isEmpty) {
-                                    return 'Game name is required';
-                                  }
-                                  return null;
-                                },
-                                decoration: InputDecoration(
-                                  labelText: 'Enter game name',
-                                  labelStyle: const TextStyle(color: subtle),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                  filled: true,
-                                  fillColor: Colors.transparent,
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                                ),
-                              ),
-                            ),
-                            
-                            const SizedBox(height: 24),
-                            
-                            // Event Poster Generation
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Event Poster (Optional)',
-                                  style: TextStyle(
-                                    color: Theme.of(context).colorScheme.onSurface,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: card.withValues(alpha: 0.8),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
-                                  ),
-                                  child: Column(
-                                    children: [
-                                      // Current poster preview
-                                      if (_posterBackgroundUrl != null)
-                                        Container(
-                                          height: 120,
-                                          width: double.infinity,
-                                          margin: const EdgeInsets.all(16),
-                                          decoration: BoxDecoration(
-                                            borderRadius: BorderRadius.circular(8),
-                                            image: DecorationImage(
-                                              image: FileImage(File(_posterBackgroundUrl!)),
-                                              fit: BoxFit.cover,
-                                            ),
-                                          ),
-                                          child: Container(
-                                            decoration: BoxDecoration(
-                                              borderRadius: BorderRadius.circular(8),
-                                              color: Colors.black.withValues(alpha: 0.6),
-                                            ),
-                                            child: Center(
-                                              child: Column(
-                                                mainAxisAlignment: MainAxisAlignment.center,
-                                                children: [
-                                                  Text(
-                                                    _gameNameController.text.isNotEmpty 
-                                                        ? _gameNameController.text 
-                                                        : 'Game Name',
-                                                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-                                                  ),
-                                                  const SizedBox(height: 8),
-                                                  Text(
-                                                    _formatDate(_selectedDate),
-                                                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-                                                  ),
-                                                  Text(
-                                                    _locationController.text.isNotEmpty 
-                                                        ? _locationController.text 
-                                                        : 'Location',
-                                                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      // Poster generation button
-                                      Padding(
-                                        padding: const EdgeInsets.all(16),
-                                        child: TextButton.icon(
-                                          onPressed: _showPosterPicker,
-                                          icon: const Icon(Icons.image, size: 16),
-                                          label: Text(_posterBackgroundUrl != null 
-                                              ? 'Change Background' 
-                                              : 'Generate Poster'),
-                                          style: TextButton.styleFrom(
-                                            foregroundColor: accent,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            
-                            const SizedBox(height: 24),
-                            
-                            // Date and Time Selection
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Date',
-                                        style: TextStyle(
-                                          color: Theme.of(context).colorScheme.onSurface,
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      GestureDetector(
-                                        onTap: _selectDate,
-                                        child: Container(
-                                          padding: const EdgeInsets.all(16),
-                                          decoration: BoxDecoration(
-                                            color: card.withValues(alpha: 0.8),
-                                            borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
-                                          ),
-                                          child: Row(
-                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              Text(
-                                                _formatDate(_selectedDate),
-                                                style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 16),
-                                              ),
-                                              const Icon(Icons.calendar_today, color: accent),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Time',
-                                        style: TextStyle(
-                                          color: Theme.of(context).colorScheme.onSurface,
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      GestureDetector(
-                                        onTap: _selectTime,
-                                        child: Container(
-                                          padding: const EdgeInsets.all(16),
-                                          decoration: BoxDecoration(
-                                            color: card.withValues(alpha: 0.8),
-                                            borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
-                                          ),
-                                          child: Row(
-                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              Text(
-                                                _formatTime(_selectedTime),
-                                                style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 16),
-                                              ),
-                                              const Icon(Icons.access_time, color: accent),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            
-                            const SizedBox(height: 24),
-                            
-                            // Location
-                            Text(
-                              'Location',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.onSurface,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Container(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [
-                                    card,
-                                    card.withValues(alpha: 0.8),
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
-                              ),
-                              child: TextFormField(
-                                controller: _locationController,
-                                style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-                                validator: (value) {
-                                  if (value == null || value.trim().isEmpty) {
-                                    return 'Location is required';
-                                  }
-                                  return null;
-                                },
-                                decoration: InputDecoration(
-                                  labelText: 'Enter location (e.g., Central Park)',
-                                  labelStyle: const TextStyle(color: subtle),
-                                  prefixIcon: const Icon(Icons.location_on, color: subtle),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                  filled: true,
-                                  fillColor: Colors.transparent,
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                                ),
-                              ),
-                            ),
-                            
-                            const SizedBox(height: 24),
-                            
-                            // Location Type
-                            Text(
-                              'Location Type',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.onSurface,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Container(
-                              decoration: BoxDecoration(
-                                color: card.withValues(alpha: 0.8),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
-                              ),
-                              child: DropdownButtonFormField<String>(
-                                value: _selectedLocation,
-                                onChanged: (value) => setState(() => _selectedLocation = value!),
-                                decoration: const InputDecoration(
-                                  border: InputBorder.none,
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                ),
-                                dropdownColor: card,
-                                style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-                                items: locations.map((location) {
-                                  return DropdownMenuItem(
-                                    value: location,
-                                    child: Text(location),
-                                  );
-                                }).toList(),
-                              ),
-                            ),
-                            
-                            const SizedBox(height: 24),
-                            
-                            // Level
-                            Text(
-                              'Skill Level',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.onSurface,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Container(
-                              decoration: BoxDecoration(
-                                color: card.withValues(alpha: 0.8),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
-                              ),
-                              child: DropdownButtonFormField<String>(
-                                value: _selectedLevel,
-                                onChanged: (value) => setState(() => _selectedLevel = value!),
-                                decoration: const InputDecoration(
-                                  border: InputBorder.none,
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                ),
-                                dropdownColor: card,
-                                style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-                                items: levels.map((level) {
-                                  return DropdownMenuItem(
-                                    value: level,
-                                    child: Text(level),
-                                  );
-                                }).toList(),
-                              ),
-                            ),
-                            
-                            const SizedBox(height: 24),
-                            
-                            // Max Players
-                            Text(
-                              'Maximum Players',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.onSurface,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Container(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [
-                                    card,
-                                    card.withValues(alpha: 0.8),
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
-                              ),
-                              child: TextFormField(
-                                controller: _maxPlayersController,
-                                style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-                                keyboardType: TextInputType.number,
-                                validator: (value) {
-                                  if (value == null || value.trim().isEmpty) {
-                                    return 'Maximum players is required';
-                                  }
-                                  final number = int.tryParse(value);
-                                  if (number == null || number < 2) {
-                                    return 'Must be at least 2 players';
-                                  }
-                                  return null;
-                                },
-                                decoration: InputDecoration(
-                                  labelText: 'Enter max number of players',
-                                  labelStyle: const TextStyle(color: subtle),
-                                  prefixIcon: const Icon(Icons.people, color: subtle),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                  filled: true,
-                                  fillColor: Colors.transparent,
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                                ),
-                              ),
-                            ),
-                            
-                            const SizedBox(height: 24),
-                            
-                            // Description
-                            Text(
-                              'Description',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.onSurface,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Container(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [
-                                    card,
-                                    card.withValues(alpha: 0.8),
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
-                              ),
-                              child: TextFormField(
-                                controller: _descriptionController,
-                                style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-                                maxLines: 3,
-                                decoration: InputDecoration(
-                                  labelText: 'Describe your game (optional)',
-                                  labelStyle: const TextStyle(color: subtle),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                  filled: true,
-                                  fillColor: Colors.transparent,
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                                ),
-                              ),
-                            ),
-                            
-                            const SizedBox(height: 24),
-                            
-                            // Game Settings
-                            Text(
-                              'Game Settings',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.onSurface,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            
-                            // Private Game
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: card.withValues(alpha: 0.8),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.lock, color: subtle),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      'Private Game',
-                                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 16),
-                                    ),
-                                  ),
-                                  Switch(
-                                    value: _isPrivate,
-                                    onChanged: (value) => setState(() => _isPrivate = value),
-                                    activeColor: accent,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            
-                            const SizedBox(height: 16),
-                            
-                            // Free Game
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: card.withValues(alpha: 0.8),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.attach_money, color: subtle),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      'Free Game',
-                                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 16),
-                                    ),
-                                  ),
-                                  Switch(
-                                    value: _isFree,
-                                    onChanged: (value) => setState(() => _isFree = value),
-                                    activeColor: accent,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            
-                            // Entry Fee (if not free)
-                            if (!_isFree) ...[
-                              SizedBox(height: 16),
-                              Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: card.withValues(alpha: 0.8),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.payment, color: subtle),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(
-                                        'Entry Fee: \$${_entryFee.toStringAsFixed(2)}',
-                                        style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 16),
-                                      ),
-                                    ),
-                                    Slider(
-                                      value: _entryFee,
-                                      min: 0.0,
-                                      max: 100.0,
-                                      divisions: 100,
-                                      activeColor: accent,
-                                      onChanged: (value) => setState(() => _entryFee = value),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                            
-                            const SizedBox(height: 32),
-                            
-                            // Poster upload section
-                            const SizedBox(height: 16),
-                            
-                            // Create Button
-                            SizedBox(
-                              width: double.infinity,
-                              height: 56,
-                              child: ElevatedButton(
-                                onPressed: _isLoading ? null : _createGame,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: accent,
-                                  foregroundColor: Theme.of(context).colorScheme.onSurface,
-                                  elevation: 8,
-                                  shadowColor: accent.withValues(alpha: 0.3),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                ),
-                                child: _isLoading
-                                    ? SizedBox(
-                                        width: 24,
-                                        height: 24,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.onSurface),
-                                        ),
-                                      )
-                                    : const Text(
-                                        'CREATE GAME',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16,
-                                          letterSpacing: 1,
-                                        ),
-                                      ),
-                              ),
-                            ),
-                            
-                            const SizedBox(height: 20),
                           ],
                         ),
                       ),
                     ),
                   ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: InkWell(
+                      onTap: _selectTime,
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Time', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                            Text(
+                              _scheduledTime.format(context),
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 16),
+              
+              Row(
+                children: [
+                  const Text('Duration: '),
+                  DropdownButton<int>(
+                    value: _durationHours,
+                    items: List.generate(6, (index) => index + 1).map((hours) {
+                      return DropdownMenuItem(
+                        value: hours,
+                        child: Text('$hours hour${hours > 1 ? 's' : ''}'),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _durationHours = value!;
+                      });
+                    },
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // Location Section
+              _buildSectionHeader('Location'),
+              const SizedBox(height: 16),
+              
+              if (_isLoadingLocation)
+                const Center(child: CircularProgressIndicator())
+              else if (_location != null)
+                AppCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.location_on, color: Colors.red),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _location!.venueName ?? 'Current Location',
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                Text(_location!.address),
+                                Text('${_location!.city}, ${_location!.state}'),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: _getCurrentLocation,
+                            icon: const Icon(Icons.refresh),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                )
+              else
+                AppCard(
+                  child: Column(
+                    children: [
+                      const Icon(Icons.location_off, size: 48, color: Colors.grey),
+                      const SizedBox(height: 8),
+                      const Text('Location not set'),
+                      const SizedBox(height: 8),
+                      AppButton(
+                        text: 'Set Location',
+                        onPressed: _getCurrentLocation,
+                      ),
+                    ],
+                  ),
+                ),
+              
+              const SizedBox(height: 16),
+              
+              ModernInputField(
+                controller: _venueNameController,
+                label: 'Venue Name (Optional)',
+                hint: 'e.g., Central Park, Sports Complex',
+                onChanged: (value) {
+                  if (_location != null) {
+                    setState(() {
+                      _location = _location!.copyWith(
+                        venueName: value.isNotEmpty ? value : null,
+                      );
+                    });
+                  }
+                },
+              ),
+              
+              const SizedBox(height: 16),
+              
+              ModernInputField(
+                controller: _venueDetailsController,
+                label: 'Venue Details (Optional)',
+                hint: 'e.g., Field 3, Indoor Court A',
+                onChanged: (value) {
+                  if (_location != null) {
+                    setState(() {
+                      _location = _location!.copyWith(
+                        venueDetails: value.isNotEmpty ? value : null,
+                      );
+                    });
+                  }
+                },
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // Players & Pricing Section
+              _buildSectionHeader('Players & Pricing'),
+              const SizedBox(height: 16),
+              
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Min Players'),
+                        Slider(
+                          value: _minPlayers.toDouble(),
+                          min: 1,
+                          max: _maxPlayers.toDouble(),
+                          divisions: _maxPlayers - 1,
+                          label: _minPlayers.toString(),
+                          onChanged: (value) {
+                            setState(() {
+                              _minPlayers = value.round();
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Max Players'),
+                        Slider(
+                          value: _maxPlayers.toDouble(),
+                          min: _minPlayers.toDouble(),
+                          max: 50,
+                          divisions: 50 - _minPlayers,
+                          label: _maxPlayers.toString(),
+                          onChanged: (value) {
+                            setState(() {
+                              _maxPlayers = value.round();
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 16),
+              
+              Row(
+                children: [
+                  Expanded(
+                    child: ModernInputField(
+                      label: 'Price',
+                      hint: '0.00',
+                      keyboardType: TextInputType.number,
+                      onChanged: (value) {
+                        _price = double.tryParse(value) ?? 0.0;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: _selectedCurrency,
+                      decoration: const InputDecoration(
+                        labelText: 'Currency',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: _currencies.map((currency) {
+                        return DropdownMenuItem(
+                          value: currency,
+                          child: Text(currency),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedCurrency = value!;
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // Rules Section
+              _buildSectionHeader('Rules & Guidelines'),
+              const SizedBox(height: 16),
+              
+              Row(
+                children: [
+                  Expanded(
+                    child: ModernInputField(
+                      controller: _rulesController,
+                      label: 'Add Rule',
+                      hint: 'e.g., Bring your own equipment',
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  ElevatedButton(
+                    onPressed: _addRule,
+                    child: const Text('Add'),
+                  ),
+                ],
+              ),
+              
+              if (_rules.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                ...(_rules.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final rule = entry.value;
+                  return Card(
+                    child: ListTile(
+                      title: Text(rule),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: () => _removeRule(index),
+                      ),
+                    ),
+                  );
+                })),
+              ],
+              
+              const SizedBox(height: 24),
+              
+              // Tags Section
+              _buildSectionHeader('Tags'),
+              const SizedBox(height: 16),
+              
+              if (_tags.isNotEmpty)
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _tags.map((tag) {
+                    return Chip(
+                      label: Text(tag),
+                      onDeleted: () {
+                        setState(() {
+                          _tags.remove(tag);
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+              
+              const SizedBox(height: 16),
+              
+              AppButton(
+                text: 'Add Tags',
+                onPressed: _addTag,
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // Settings Section
+              _buildSectionHeader('Settings'),
+              const SizedBox(height: 16),
+              
+              SwitchListTile(
+                title: const Text('Private Game'),
+                subtitle: const Text('Only invited users can see and join'),
+                value: _isPrivate,
+                onChanged: (value) {
+                  setState(() {
+                    _isPrivate = value;
+                  });
+                },
+              ),
+              
+              SwitchListTile(
+                title: const Text('Require Check-in'),
+                subtitle: const Text('Participants must check in before the game'),
+                value: _requiresCheckIn,
+                onChanged: (value) {
+                  setState(() {
+                    _requiresCheckIn = value;
+                    if (!value) _checkInDeadline = null;
+                  });
+                },
+              ),
+              
+              if (_requiresCheckIn) ...[
+                const SizedBox(height: 16),
+                InkWell(
+                  onTap: _selectCheckInDeadline,
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Check-in Deadline', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                        Text(
+                          _checkInDeadline != null
+                              ? DateFormat('MMM dd, yyyy HH:mm').format(_checkInDeadline!)
+                              : 'Set deadline',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+              
+              const SizedBox(height: 40),
+              
+              // Create Button
+              SizedBox(
+                width: double.infinity,
+                child: AppButton(
+                  text: _isCreatingGame ? 'Creating...' : 'Create Game',
+                  onPressed: _isCreatingGame ? null : _createGame,
                 ),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Divider(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)),
+      ],
     );
   }
 }

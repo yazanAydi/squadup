@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/interfaces/team_service_interface.dart';
 import '../services/service_locator.dart';
+import '../core/theme/app_colors.dart';
 
 class TeamInvitationsScreen extends StatefulWidget {
   const TeamInvitationsScreen({super.key});
@@ -75,7 +76,7 @@ class _TeamInvitationsScreenState extends State<TeamInvitationsScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error loading invitations: ${e.toString()}'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.red,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
@@ -96,7 +97,7 @@ class _TeamInvitationsScreenState extends State<TeamInvitationsScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Team invitation accepted!'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.green,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
@@ -109,7 +110,7 @@ class _TeamInvitationsScreenState extends State<TeamInvitationsScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error accepting invitation: ${e.toString()}'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.red,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
@@ -130,7 +131,7 @@ class _TeamInvitationsScreenState extends State<TeamInvitationsScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Team invitation declined.'),
-            backgroundColor: Colors.orange,
+            backgroundColor: AppColors.orange,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
@@ -143,7 +144,7 @@ class _TeamInvitationsScreenState extends State<TeamInvitationsScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error declining invitation: ${e.toString()}'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.red,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
@@ -178,10 +179,10 @@ class _TeamInvitationsScreenState extends State<TeamInvitationsScreen>
           ],
         ),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+        border: Border.all(color: AppColors.orange.withValues(alpha: 0.3)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
+            color: AppColors.outline.withValues(alpha: 0.2),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -222,17 +223,14 @@ class _TeamInvitationsScreenState extends State<TeamInvitationsScreen>
                     children: [
                       Text(
                         invitation['name'],
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface,
-                          fontSize: 20,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
                         invitation['sport'],
-                        style: TextStyle(
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                          fontSize: 16,
                         ),
                       ),
                     ],
@@ -254,9 +252,8 @@ class _TeamInvitationsScreenState extends State<TeamInvitationsScreen>
                 const SizedBox(width: 8),
                 Text(
                   invitation['location'],
-                  style: TextStyle(
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
-                    fontSize: 14,
                   ),
                 ),
                 const SizedBox(width: 24),
@@ -268,9 +265,8 @@ class _TeamInvitationsScreenState extends State<TeamInvitationsScreen>
                 const SizedBox(width: 8),
                 Text(
                   invitation['level'],
-                  style: TextStyle(
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
-                    fontSize: 14,
                   ),
                 ),
                 const SizedBox(width: 24),
@@ -282,9 +278,8 @@ class _TeamInvitationsScreenState extends State<TeamInvitationsScreen>
                 const SizedBox(width: 8),
                 Text(
                   '${invitation['memberCount']}/${invitation['maxMembers']}',
-                  style: TextStyle(
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
-                    fontSize: 14,
                   ),
                 ),
               ],
@@ -294,9 +289,8 @@ class _TeamInvitationsScreenState extends State<TeamInvitationsScreen>
               const SizedBox(height: 16),
               Text(
                 invitation['description'],
-                style: TextStyle(
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
-                  fontSize: 14,
                   height: 1.4,
                 ),
               ),
@@ -311,17 +305,16 @@ class _TeamInvitationsScreenState extends State<TeamInvitationsScreen>
                   child: ElevatedButton(
                     onPressed: () => _acceptInvitation(invitation['id']),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
+                      backgroundColor: AppColors.green,
                       foregroundColor: Theme.of(context).colorScheme.onSurface,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Accept',
-                      style: TextStyle(
-                        fontSize: 16,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -332,17 +325,16 @@ class _TeamInvitationsScreenState extends State<TeamInvitationsScreen>
                   child: OutlinedButton(
                     onPressed: () => _declineInvitation(invitation['id']),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red,
-                      side: BorderSide(color: Colors.red.withValues(alpha: 0.6)),
+                      foregroundColor: AppColors.red,
+                      side: BorderSide(color: AppColors.red.withValues(alpha: 0.6)),
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Decline',
-                      style: TextStyle(
-                        fontSize: 16,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -383,9 +375,7 @@ class _TeamInvitationsScreenState extends State<TeamInvitationsScreen>
                     Expanded(
                       child: Text(
                         'Team Invitations',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface,
-                          fontSize: 24,
+                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                         textAlign: TextAlign.center,
@@ -417,17 +407,15 @@ class _TeamInvitationsScreenState extends State<TeamInvitationsScreen>
                                       const SizedBox(height: 16),
                                       Text(
                                         'No invitations',
-                                        style: TextStyle(
+                                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
                                           color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                                          fontSize: 18,
                                         ),
                                       ),
                                       const SizedBox(height: 8),
                                       Text(
                                         'You haven\'t received any team invitations yet',
-                                        style: TextStyle(
+                                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                           color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-                                          fontSize: 14,
                                         ),
                                         textAlign: TextAlign.center,
                                       ),

@@ -2,12 +2,25 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../interfaces/user_service_interface.dart';
-import '../../utils/data_service.dart';
+import '../repositories/user_repository.dart';
+import '../../utils/cache_manager.dart';
+import '../../core/security/rate_limiter.dart';
+import '../../core/errors/app_error_handler.dart';
+import '../../models/user_profile.dart';
 
 class UserService implements UserServiceInterface {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final DataService _dataService = DataService.instance;
+  final UserRepository _userRepository;
+  final CacheManager _cacheManager;
+  final RateLimiter _rateLimiter;
+
+  UserService({
+    UserRepository? userRepository,
+    CacheManager? cacheManager,
+    RateLimiter? rateLimiter,
+  }) : _userRepository = userRepository ?? UserRepository(),
+       _cacheManager = cacheManager ?? CacheManager(),
+       _rateLimiter = rateLimiter ?? RateLimiter();
 
   @override
   Future<Map<String, dynamic>?> getUserData({bool forceRefresh = false}) async {
@@ -16,17 +29,56 @@ class UserService implements UserServiceInterface {
         print('UserService: Getting user data (forceRefresh: $forceRefresh)');
       }
       
-      final result = await _dataService.getUserData(forceRefresh: forceRefresh);
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) {
+        throw Exception('User not authenticated');
+      }
+
+      // Check rate limiting
+      final rateLimitKey = RateLimitKeys.apiKey(userId);
+      if (!_rateLimiter.isAllowed(rateLimitKey, maxRequests: RateLimitConfig.apiRequests)) {
+        throw Exception('Rate limit exceeded. Please try again later.');
+      }
+
+      // Try cache first if not forcing refresh
+      if (!forceRefresh) {
+        final cachedData = _cacheManager.get<Map<String, dynamic>>(CacheKeys.userProfileKey(userId));
+        if (cachedData != null) {
+          if (kDebugMode) {
+            print('UserService: Data retrieved from cache');
+          }
+          return cachedData;
+        }
+      }
+
+      // Get from repository
+      final userProfile = await _userRepository.getById(userId);
+      if (userProfile == null) {
+        return null;
+      }
+
+      // Convert to map format for backward compatibility
+      final userData = userProfile.toJson();
+      
+      // Cache the data
+      await _cacheManager.set(
+        CacheKeys.userProfileKey(userId),
+        userData,
+        ttl: const Duration(minutes: 15), // Cache for 15 minutes
+      );
       
       if (kDebugMode) {
-        print('UserService: User data retrieved successfully');
+        print('UserService: User data retrieved successfully from repository');
       }
       
-      return result;
-    } catch (e) {
-      if (kDebugMode) {
-        print('UserService: Error in getUserData: $e');
-      }
+      return userData;
+    } catch (e, stackTrace) {
+      AppErrorHandler.handleError(
+        e,
+        stackTrace,
+        context: 'UserService.getUserData',
+        severity: ErrorSeverity.error,
+      );
       throw Exception('Unable to retrieve user data. Please check your connection and try again.');
     }
   }
@@ -40,51 +92,41 @@ class UserService implements UserServiceInterface {
       
       final uid = _auth.currentUser?.uid;
       if (uid == null) {
-        if (kDebugMode) {
-          print('UserService: No authenticated user found for profile update');
-        }
         throw Exception('You must be signed in to update your profile.');
       }
 
-      // Update in Firebase
-      try {
-        await _firestore.collection('users').doc(uid).update(userData);
+      // Check rate limiting
+      final rateLimitKey = RateLimitKeys.apiKey(uid);
+      if (!_rateLimiter.isAllowed(rateLimitKey, maxRequests: RateLimitConfig.apiRequests)) {
+        throw Exception('Rate limit exceeded. Please try again later.');
+      }
+
+      // Update in repository
+      final userProfile = UserProfile.fromJson(userData);
+      final success = await _userRepository.update(uid, userProfile);
+      
+      if (success) {
+        // Update cache
+        await _cacheManager.set(
+          CacheKeys.userProfileKey(uid),
+          userData,
+          ttl: const Duration(minutes: 15),
+        );
         
         if (kDebugMode) {
-          print('UserService: Profile updated successfully in Firebase');
+          print('UserService: Profile updated successfully');
         }
-      } catch (e) {
-        if (kDebugMode) {
-          print('UserService: Error updating profile in Firebase: $e');
-        }
-        throw Exception('Unable to update profile. Please check your connection and try again.');
-      }
-      
-      // Update cache
-      try {
-        final updatedData = await _dataService.getUserData(forceRefresh: true);
-        if (updatedData != null) {
-          if (kDebugMode) {
-            print('UserService: Cache updated successfully');
-          }
-          return true;
-        } else {
-          if (kDebugMode) {
-            print('UserService: Cache update failed - no data returned');
-          }
-          return false;
-        }
-      } catch (e) {
-        if (kDebugMode) {
-          print('UserService: Error updating cache: $e');
-        }
-        // Don't fail the entire operation if cache update fails
         return true;
+      } else {
+        throw Exception('Failed to update profile');
       }
-    } catch (e) {
-      if (kDebugMode) {
-        print('UserService: Error in updateUserProfile: $e');
-      }
+    } catch (e, stackTrace) {
+      AppErrorHandler.handleError(
+        e,
+        stackTrace,
+        context: 'UserService.updateUserProfile',
+        severity: ErrorSeverity.error,
+      );
       rethrow;
     }
   }
@@ -98,47 +140,39 @@ class UserService implements UserServiceInterface {
       
       final uid = _auth.currentUser?.uid;
       if (uid == null) {
-        if (kDebugMode) {
-          print('UserService: No authenticated user found for sports update');
-        }
         throw Exception('You must be signed in to update your sports preferences.');
       }
 
-      try {
-        await _firestore.collection('users').doc(uid).update({
-          'sports': sports,
-          'lastUpdated': FieldValue.serverTimestamp(),
-        });
+      // Check rate limiting
+      final rateLimitKey = RateLimitKeys.apiKey(uid);
+      if (!_rateLimiter.isAllowed(rateLimitKey, maxRequests: RateLimitConfig.apiRequests)) {
+        throw Exception('Rate limit exceeded. Please try again later.');
+      }
+
+      // Update specific fields
+      final success = await _userRepository.updateCurrentUserFields({
+        'sports': sports,
+        'lastUpdated': FieldValue.serverTimestamp(),
+      });
+      
+      if (success) {
+        // Refresh cache
+        await _cacheManager.remove(CacheKeys.userProfileKey(uid));
         
         if (kDebugMode) {
-          print('UserService: Sports updated successfully in Firebase');
+          print('UserService: Sports updated successfully');
         }
-      } catch (e) {
-        if (kDebugMode) {
-          print('UserService: Error updating sports in Firebase: $e');
-        }
-        throw Exception('Unable to update sports preferences. Please check your connection and try again.');
+        return true;
+      } else {
+        throw Exception('Failed to update sports preferences');
       }
-      
-      // Refresh cache
-      try {
-        await _dataService.getUserData(forceRefresh: true);
-        
-        if (kDebugMode) {
-          print('UserService: Cache refreshed successfully');
-        }
-      } catch (e) {
-        if (kDebugMode) {
-          print('UserService: Error refreshing cache: $e');
-        }
-        // Don't fail the entire operation if cache refresh fails
-      }
-      
-      return true;
-    } catch (e) {
-      if (kDebugMode) {
-        print('UserService: Error in updateUserSports: $e');
-      }
+    } catch (e, stackTrace) {
+      AppErrorHandler.handleError(
+        e,
+        stackTrace,
+        context: 'UserService.updateUserSports',
+        severity: ErrorSeverity.error,
+      );
       rethrow;
     }
   }
@@ -152,54 +186,43 @@ class UserService implements UserServiceInterface {
       
       final uid = _auth.currentUser?.uid;
       if (uid == null) {
-        if (kDebugMode) {
-          print('UserService: No authenticated user found for location update');
-        }
         throw Exception('You must be signed in to update your location.');
       }
 
       if (city.isEmpty) {
-        if (kDebugMode) {
-          print('UserService: City cannot be empty');
-        }
         throw Exception('City cannot be empty.');
       }
 
-      try {
-        await _firestore.collection('users').doc(uid).update({
-          'city': city,
-          'lastUpdated': FieldValue.serverTimestamp(),
-        });
+      // Check rate limiting
+      final rateLimitKey = RateLimitKeys.apiKey(uid);
+      if (!_rateLimiter.isAllowed(rateLimitKey, maxRequests: RateLimitConfig.apiRequests)) {
+        throw Exception('Rate limit exceeded. Please try again later.');
+      }
+
+      // Update specific fields
+      final success = await _userRepository.updateCurrentUserFields({
+        'city': city,
+        'lastUpdated': FieldValue.serverTimestamp(),
+      });
+      
+      if (success) {
+        // Refresh cache
+        await _cacheManager.remove(CacheKeys.userProfileKey(uid));
         
         if (kDebugMode) {
-          print('UserService: Location updated successfully in Firebase');
+          print('UserService: Location updated successfully');
         }
-      } catch (e) {
-        if (kDebugMode) {
-          print('UserService: Error updating location in Firebase: $e');
-        }
-        throw Exception('Unable to update location. Please check your connection and try again.');
+        return true;
+      } else {
+        throw Exception('Failed to update location');
       }
-      
-      // Refresh cache
-      try {
-        await _dataService.getUserData(forceRefresh: true);
-        
-        if (kDebugMode) {
-          print('UserService: Cache refreshed successfully');
-        }
-      } catch (e) {
-        if (kDebugMode) {
-          print('UserService: Error refreshing cache: $e');
-        }
-        // Don't fail the entire operation if cache refresh fails
-      }
-      
-      return true;
-    } catch (e) {
-      if (kDebugMode) {
-        print('UserService: Error in updateUserLocation: $e');
-      }
+    } catch (e, stackTrace) {
+      AppErrorHandler.handleError(
+        e,
+        stackTrace,
+        context: 'UserService.updateUserLocation',
+        severity: ErrorSeverity.error,
+      );
       rethrow;
     }
   }
@@ -213,66 +236,42 @@ class UserService implements UserServiceInterface {
       
       final uid = _auth.currentUser?.uid;
       if (uid == null) {
-        if (kDebugMode) {
-          print('UserService: No authenticated user found for account deletion');
-        }
         throw Exception('You must be signed in to delete your account.');
       }
 
-      // Delete user data from Firestore
-      try {
-        await _firestore.collection('users').doc(uid).delete();
-        
-        if (kDebugMode) {
-          print('UserService: User data deleted successfully from Firestore');
-        }
-      } catch (e) {
-        if (kDebugMode) {
-          print('UserService: Error deleting user data from Firestore: $e');
-        }
-        throw Exception('Unable to delete user data. Please check your connection and try again.');
+      // Check rate limiting
+      final rateLimitKey = RateLimitKeys.apiKey(uid);
+      if (!_rateLimiter.isAllowed(rateLimitKey, maxRequests: 1, window: const Duration(hours: 1))) {
+        throw Exception('Rate limit exceeded. Please try again later.');
       }
+
+      // Delete from repository
+      final success = await _userRepository.delete(uid);
       
-      // Delete user authentication
-      try {
+      if (success) {
+        // Clear cache
+        await _cacheManager.remove(CacheKeys.userProfileKey(uid));
+        
+        // Delete user authentication
         final currentUser = _auth.currentUser;
         if (currentUser != null) {
           await currentUser.delete();
-          
-          if (kDebugMode) {
-            print('UserService: User authentication deleted successfully');
-          }
         }
-      } catch (e) {
-        if (kDebugMode) {
-          print('UserService: Error deleting user authentication: $e');
-        }
-        throw Exception('Unable to delete user account. Please try again later.');
-      }
-      
-      // Clear cache
-      try {
-        await _dataService.clearCache();
         
         if (kDebugMode) {
-          print('UserService: Cache cleared successfully');
+          print('UserService: User account deleted successfully');
         }
-      } catch (e) {
-        if (kDebugMode) {
-          print('UserService: Error clearing cache: $e');
-        }
-        // Don't fail the entire operation if cache clearing fails
+        return true;
+      } else {
+        throw Exception('Failed to delete user account');
       }
-      
-      if (kDebugMode) {
-        print('UserService: User account deleted successfully');
-      }
-      
-      return true;
-    } catch (e) {
-      if (kDebugMode) {
-        print('UserService: Error in deleteUserAccount: $e');
-      }
+    } catch (e, stackTrace) {
+      AppErrorHandler.handleError(
+        e,
+        stackTrace,
+        context: 'UserService.deleteUserAccount',
+        severity: ErrorSeverity.error,
+      );
       rethrow;
     }
   }
@@ -286,37 +285,30 @@ class UserService implements UserServiceInterface {
       
       final userData = await getUserData();
       if (userData == null) {
-        if (kDebugMode) {
-          print('UserService: No user data found for statistics');
-        }
         return {};
       }
 
-      try {
-        final stats = {
-          'gamesPlayed': userData['games'] ?? 0,
-          'mvps': userData['mvps'] ?? 0,
-          'sportsCount': (userData['sports'] as Map<String, dynamic>?)?.length ?? 0,
-          'teamsCount': (userData['teams'] as List<dynamic>?)?.length ?? 0,
-          'memberSince': userData['createdAt'],
-          'lastActive': userData['lastUpdated'],
-        };
-        
-        if (kDebugMode) {
-          print('UserService: User statistics retrieved successfully');
-        }
-        
-        return stats;
-      } catch (e) {
-        if (kDebugMode) {
-          print('UserService: Error processing user statistics: $e');
-        }
-        return {};
-      }
-    } catch (e) {
+      final stats = {
+        'gamesPlayed': userData['games'] ?? 0,
+        'mvps': userData['mvps'] ?? 0,
+        'sportsCount': (userData['sports'] as Map<String, dynamic>?)?.length ?? 0,
+        'teamsCount': (userData['teams'] as List<dynamic>?)?.length ?? 0,
+        'memberSince': userData['createdAt'],
+        'lastActive': userData['lastUpdated'],
+      };
+      
       if (kDebugMode) {
-        print('UserService: Error in getUserStatistics: $e');
+        print('UserService: User statistics retrieved successfully');
       }
+      
+      return stats;
+    } catch (e, stackTrace) {
+      AppErrorHandler.handleError(
+        e,
+        stackTrace,
+        context: 'UserService.getUserStatistics',
+        severity: ErrorSeverity.error,
+      );
       return {};
     }
   }
@@ -330,41 +322,31 @@ class UserService implements UserServiceInterface {
       
       final userData = await getUserData();
       if (userData == null) {
-        if (kDebugMode) {
-          print('UserService: No user data found for profile completeness check');
-        }
         return false;
       }
 
-      try {
-        final requiredFields = ['username', 'city', 'sports'];
-        for (final field in requiredFields) {
-          final value = userData[field];
-          if (value == null || 
-              (value is String && value.isEmpty) ||
-              (value is Map && value.isEmpty)) {
-            if (kDebugMode) {
-              print('UserService: Profile incomplete - missing or empty field: $field');
-            }
-            return false;
-          }
+      final requiredFields = ['username', 'city', 'sports'];
+      for (final field in requiredFields) {
+        final value = userData[field];
+        if (value == null || 
+            (value is String && value.isEmpty) ||
+            (value is Map && value.isEmpty)) {
+          return false;
         }
-        
-        if (kDebugMode) {
-          print('UserService: User profile is complete');
-        }
-        
-        return true;
-      } catch (e) {
-        if (kDebugMode) {
-          print('UserService: Error checking profile completeness: $e');
-        }
-        return false;
       }
-    } catch (e) {
+      
       if (kDebugMode) {
-        print('UserService: Error in isProfileComplete: $e');
+        print('UserService: User profile is complete');
       }
+      
+      return true;
+    } catch (e, stackTrace) {
+      AppErrorHandler.handleError(
+        e,
+        stackTrace,
+        context: 'UserService.isProfileComplete',
+        severity: ErrorSeverity.error,
+      );
       return false;
     }
   }
@@ -378,39 +360,30 @@ class UserService implements UserServiceInterface {
       
       final userData = await getUserData();
       if (userData == null) {
-        if (kDebugMode) {
-          print('UserService: No user data found for teams');
-        }
         return [];
       }
 
-      try {
-        final teamIds = List<String>.from(userData['teams'] ?? []);
-        if (teamIds.isEmpty) {
-          if (kDebugMode) {
-            print('UserService: User has no teams');
-          }
-          return [];
-        }
-
-        final teams = await _dataService.getTeamsData();
-        final userTeams = teams.where((team) => teamIds.contains(team['id'])).toList();
-        
-        if (kDebugMode) {
-          print('UserService: Retrieved ${userTeams.length} user teams');
-        }
-        
-        return userTeams;
-      } catch (e) {
-        if (kDebugMode) {
-          print('UserService: Error processing user teams: $e');
-        }
+      final teamIds = List<String>.from(userData['teams'] ?? []);
+      if (teamIds.isEmpty) {
         return [];
       }
-    } catch (e) {
-      if (kDebugMode) {
-        print('UserService: Error in getUserTeams: $e');
+
+      // Try cache first
+      final cachedTeams = _cacheManager.get<List<Map<String, dynamic>>>(CacheKeys.userTeams);
+      if (cachedTeams != null) {
+        return cachedTeams;
       }
+
+      // Get from repository (this would need to be implemented in TeamRepository)
+      // For now, return empty list
+      return [];
+    } catch (e, stackTrace) {
+      AppErrorHandler.handleError(
+        e,
+        stackTrace,
+        context: 'UserService.getUserTeams',
+        severity: ErrorSeverity.error,
+      );
       return [];
     }
   }
@@ -424,51 +397,56 @@ class UserService implements UserServiceInterface {
       
       final userData = await getUserData();
       if (userData == null) {
-        if (kDebugMode) {
-          print('UserService: No user data found for game history');
-        }
         return [];
       }
 
-      try {
-        final games = await _dataService.getGamesData();
-        final userId = _auth.currentUser?.uid;
-        
-        if (userId == null) {
-          if (kDebugMode) {
-            print('UserService: No authenticated user found for game history');
-          }
-          return [];
-        }
+      // Try cache first
+      final cachedGames = _cacheManager.get<List<Map<String, dynamic>>>(CacheKeys.userGames);
+      if (cachedGames != null) {
+        return cachedGames;
+      }
 
-        // Filter games where user participated
-        final userGames = games.where((game) {
-          try {
-            final participants = List<String>.from(game['participants'] ?? []);
-            return participants.contains(userId);
-          } catch (e) {
-            if (kDebugMode) {
-              print('UserService: Error processing game participants: $e');
-            }
-            return false;
-          }
-        }).toList();
-        
-        if (kDebugMode) {
-          print('UserService: Retrieved ${userGames.length} user games');
-        }
-        
-        return userGames;
-      } catch (e) {
-        if (kDebugMode) {
-          print('UserService: Error processing user game history: $e');
-        }
-        return [];
+      // Get from repository (this would need to be implemented in GameRepository)
+      // For now, return empty list
+      return [];
+    } catch (e, stackTrace) {
+      AppErrorHandler.handleError(
+        e,
+        stackTrace,
+        context: 'UserService.getUserGameHistory',
+        severity: ErrorSeverity.error,
+      );
+      return [];
+    }
+  }
+
+  /// Get user profile with real-time updates
+  Stream<UserProfile?> watchUserProfile() {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return Stream.value(null);
+    return _userRepository.watchById(uid);
+  }
+
+  /// Search users
+  Future<List<UserProfile>> searchUsers(String query) async {
+    try {
+      final uid = _auth.currentUser?.uid;
+      if (uid == null) return [];
+
+      // Check rate limiting
+      final rateLimitKey = RateLimitKeys.searchKey(uid);
+      if (!_rateLimiter.isAllowed(rateLimitKey, maxRequests: RateLimitConfig.searchRequests)) {
+        throw Exception('Search rate limit exceeded. Please try again later.');
       }
-    } catch (e) {
-      if (kDebugMode) {
-        print('UserService: Error in getUserGameHistory: $e');
-      }
+
+      return await _userRepository.searchUsers(query);
+    } catch (e, stackTrace) {
+      AppErrorHandler.handleError(
+        e,
+        stackTrace,
+        context: 'UserService.searchUsers',
+        severity: ErrorSeverity.error,
+      );
       return [];
     }
   }

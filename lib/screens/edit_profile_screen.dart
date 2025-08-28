@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../utils/responsive_utils.dart';
 import '../services/image_uploader.dart';
+import '../core/theme/app_colors.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -34,10 +35,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _isLoading = false;
 
   // THEME
-  static const Color bg = Color(0xFF0A0A0A);
-  static const Color card = Color(0xFF1A1A1A);
-  static const Color accent = Color(0xFF8C6CFF);
-  static const Color subtle = Color(0xFF6B7280);
+
 
   // Supported sports + positions
   static const List<String> kSports = ['Basketball', 'Soccer', 'Volleyball'];
@@ -137,7 +135,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Profile updated successfully!'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.green,
             duration: Duration(seconds: 2),
           ),
         );
@@ -148,7 +146,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Error saving profile: ${e.toString()}"),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.red,
             duration: const Duration(seconds: 3),
           ),
         );
@@ -186,7 +184,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text("All supported sports are already added."),
-            backgroundColor: Colors.orange,
+            backgroundColor: AppColors.orange,
             duration: Duration(seconds: 2),
           ),
         );
@@ -199,7 +197,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     await showModalBottomSheet(
       context: context,
-      backgroundColor: card,
+      backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -224,7 +222,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 value: selectedSport,
-                dropdownColor: card,
+                dropdownColor: AppColors.surface,
                 decoration: _dropdownDecoration('Sport'),
                 iconEnabledColor: Theme.of(context).colorScheme.onSurface,
                 items: available
@@ -250,7 +248,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 value: selectedPosition,
-                dropdownColor: card,
+                dropdownColor: AppColors.surface,
                 decoration: _dropdownDecoration('Position'),
                 iconEnabledColor: Theme.of(context).colorScheme.onSurface,
                 items: kPositions[selectedSport]!
@@ -266,7 +264,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 width: double.infinity,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: accent,
+                    backgroundColor: AppColors.primary,
                     foregroundColor: Theme.of(context).colorScheme.onSurface,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -287,7 +285,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           content: Text(editingSport != null 
                             ? 'Sport updated successfully!' 
                             : 'Sport added successfully!'),
-                          backgroundColor: Colors.green,
+                          backgroundColor: AppColors.green,
                           duration: const Duration(seconds: 2),
                         ),
                       );
@@ -308,7 +306,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: card,
+        backgroundColor: AppColors.surface,
         title: Text('Delete Sport', style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
         content: Text(
           'Are you sure you want to remove $sport from your profile?',
@@ -317,11 +315,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+            child: Text('Cancel', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            child: Text('Delete', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.red)),
           ),
         ],
       ),
@@ -335,7 +333,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('$sport removed from your profile'),
-            backgroundColor: Colors.orange,
+            backgroundColor: AppColors.orange,
             duration: const Duration(seconds: 2),
           ),
         );
@@ -400,7 +398,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         messenger.showSnackBar(
           SnackBar(
             content: Text('Error picking image: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.red,
           ),
         );
       }
@@ -435,7 +433,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         messenger.showSnackBar(
           const SnackBar(
             content: Text('Avatar updated successfully!'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.green,
           ),
         );
       }
@@ -446,7 +444,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         messenger.showSnackBar(
           SnackBar(
             content: Text('Error updating avatar: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.red,
           ),
         );
       }
@@ -456,9 +454,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: bg,
+        backgroundColor: AppColors.background,
         title: const Text('Edit Profile'),
         actions: [
           _isLoading
@@ -469,7 +467,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     height: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(accent),
+                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
                     ),
                   ),
                 )
@@ -480,7 +478,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: accent))
+          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
           : SafeArea(
               child: SingleChildScrollView(
                 padding: EdgeInsets.fromLTRB(
@@ -502,7 +500,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               children: [
                                 CircleAvatar(
                                   radius: ResponsiveUtils.getResponsiveAvatarRadius(context),
-                                  backgroundColor: card,
+                                  backgroundColor: AppColors.surface,
                                   backgroundImage: _photoUrl != null
                                       ? NetworkImage(_photoUrl!)
                                       : const AssetImage('assets/default_avatar.png') as ImageProvider,
@@ -512,9 +510,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                   right: 0,
                                   child: Container(
                                     decoration: BoxDecoration(
-                                      color: accent,
+                                      color: AppColors.primary,
                                       shape: BoxShape.circle,
-                                      border: Border.all(color: bg, width: 2),
+                                      border: Border.all(color: AppColors.background, width: 2),
                                     ),
                                     child: IconButton(
                                       icon: const Icon(Icons.camera_alt),
@@ -535,7 +533,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               icon: const Icon(Icons.photo_library, size: 16),
                               label: const Text('Choose Avatar'),
                               style: TextButton.styleFrom(
-                                foregroundColor: accent,
+                                foregroundColor: AppColors.primary,
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                               ),
                             ),
@@ -584,7 +582,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       // Level
                       DropdownButtonFormField<String>(
                         value: _level.isEmpty ? null : _level,
-                        dropdownColor: card,
+                        dropdownColor: AppColors.surface,
                         decoration: _inputDecoration('Level'),
                         items: const ['Beginner', 'Intermediate', 'Advanced']
                             .map((l) => DropdownMenuItem(
@@ -679,7 +677,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               width: double.infinity,
                               padding: ResponsiveUtils.getResponsivePadding(context),
                               decoration: BoxDecoration(
-                                color: card.withValues(alpha: 0.5),
+                                color: AppColors.surface.withValues(alpha: 0.5),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
                               ),
@@ -714,7 +712,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                     icon: const Icon(Icons.add, size: 18),
                                     label: const Text('Add Sport'),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: accent,
+                                      backgroundColor: AppColors.primary,
                                       foregroundColor: Theme.of(context).colorScheme.onSurface,
                                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                     ),
@@ -729,14 +727,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                   child: ListView.separated(
                                     scrollDirection: Axis.horizontal,
                                     itemCount: _sports.length,
-                                    separatorBuilder: (_, __) => const SizedBox(width: 10),
+                                    separatorBuilder: (context, index) => const SizedBox(width: 10),
                                     itemBuilder: (ctx, i) {
                                       final sport = _sports.keys.elementAt(i);
                                       final pos = _sports[sport]!;
                                       return Container(
                                         width: 140, // Fixed width that's large enough for all content
                                         decoration: BoxDecoration(
-                                          color: card, 
+                                          color: AppColors.surface, 
                                           borderRadius: BorderRadius.circular(16)
                                         ),
                                         padding: const EdgeInsets.all(16),
@@ -769,8 +767,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                             // Position
                                             Text(
                                               pos,
-                                              style: const TextStyle(
-                                                color: Colors.grey, 
+                                              style: TextStyle(
+                                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6), 
                                                 fontSize: 12,
                                               ),
                                               textAlign: TextAlign.center,
@@ -798,7 +796,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                                 IconButton(
                                                   icon: const Icon(
                                                     Icons.delete, 
-                                                    color: Colors.redAccent, 
+                                                    color: AppColors.red, 
                                                     size: 18
                                                   ),
                                                   padding: EdgeInsets.zero,
@@ -828,7 +826,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   InputDecoration _inputDecoration(String label) => InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: subtle),
+        labelStyle: const TextStyle(color: AppColors.outline),
         filled: true,
         fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.06),
         enabledBorder: OutlineInputBorder(
@@ -836,7 +834,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           borderRadius: BorderRadius.circular(12),
         ),
         focusedBorder: const OutlineInputBorder(
-          borderSide: BorderSide(color: accent, width: 1),
+          borderSide: BorderSide(color: AppColors.primary, width: 1),
           borderRadius: BorderRadius.all(Radius.circular(12)),
         ),
       );

@@ -1,15 +1,17 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../core/di/providers.dart';
+import 'dart:async';
+
 
 class AuthController extends StateNotifier<AsyncValue<User?>> {
   AuthController(this._auth) : super(const AsyncValue.loading()) {
-    _auth.authStateChanges().listen((user) {
+    _authSubscription = _auth.authStateChanges().listen((user) {
       state = AsyncValue.data(user);
     });
   }
 
   final FirebaseAuth _auth;
+  StreamSubscription<User?>? _authSubscription;
 
   Future<void> signOut() async {
     try {
@@ -31,9 +33,10 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
 
   User? get currentUser => _auth.currentUser;
   bool get isAuthenticated => _auth.currentUser != null;
-}
 
-final authControllerProvider = StateNotifierProvider<AuthController, AsyncValue<User?>>((ref) {
-  final auth = ref.watch(firebaseAuthProvider);
-  return AuthController(auth);
-});
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
+  }
+}
