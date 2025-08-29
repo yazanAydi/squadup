@@ -7,6 +7,7 @@ import 'implementations/user_service.dart';
 import 'implementations/team_service.dart';
 import 'implementations/game_service.dart';
 import 'implementations/chat_service.dart';
+import 'repositories/firestore_user_repository.dart';
 import '../utils/data_service.dart';
 import 'admin_service.dart';
 import 'data_cleanup_service.dart';
@@ -27,13 +28,15 @@ class ServiceLocator {
   DataCleanupService? _dataCleanupService;
   
   // Service getters
-  UserServiceInterface get userService => _userService ??= UserService();
+  UserServiceInterface get userService => _userService ??= UserService(
+    userRepository: FirestoreUserRepository(),
+  );
   TeamServiceInterface get teamService => _teamService ??= TeamService();
   GameServiceInterface get gameService => _gameService ??= GameService();
   ChatServiceInterface get chatService => _chatService ??= ChatService();
   DataService get dataService => _dataService ??= DataService.instance;
-  AdminService get adminService => _adminService ??= AdminService();
-  DataCleanupService get dataCleanupService => _dataCleanupService ??= DataCleanupService();
+  AdminService get adminService => _adminService ??= AdminService.instance;
+  DataCleanupService get dataCleanupService => _dataCleanupService ??= DataCleanupService.instance;
   
   /// Initialize all services
   Future<void> initialize() async {

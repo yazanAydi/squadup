@@ -10,19 +10,18 @@ import '../../services/interfaces/game_service_interface.dart';
 import '../../services/implementations/user_service.dart';
 import '../../services/implementations/team_service.dart';
 import '../../services/implementations/game_service.dart';
-import '../../services/repositories/user_repository.dart';
-import '../../services/repositories/team_repository.dart';
-import '../../services/repositories/game_repository.dart';
-import '../../services/interfaces/base_repository.dart';
+// import '../../services/repositories/user_repository.dart';
+// import '../../services/repositories/team_repository.dart';
+// import '../../services/repositories/game_repository.dart';
+// import '../../services/interfaces/base_repository.dart';
 import '../../controllers/user_profile_controller.dart';
 import '../../controllers/auth_controller.dart';
 import '../../controllers/team_controller.dart';
 import '../../controllers/game_feed_controller.dart';
-import '../../models/user_profile.dart';
-import '../../models/team.dart';
-import '../../models/game.dart';
+import '../../models/user_model.dart';
+import '../../models/team_model.dart';
+import '../../models/game_model.dart';
 import '../../utils/cache_manager.dart';
-import '../../core/security/rate_limiter.dart';
 
 // Firebase Core Provider
 final firebaseCoreProvider = Provider<FirebaseApp>((ref) {
@@ -45,42 +44,35 @@ final firebaseStorageProvider = Provider<FirebaseStorage>((ref) {
 });
 
 // Cache Manager Provider
-final cacheManagerProvider = Provider<CacheManager>((ref) {
-  return CacheManager();
+final cacheManagerProvider = FutureProvider<CacheManager>((ref) async {
+  return await CacheManager.getInstance();
 });
 
-// Rate Limiter Provider
-final rateLimiterProvider = Provider<RateLimiter>((ref) {
-  return RateLimiter();
-});
+// Rate Limiter Provider (placeholder)
+// final rateLimiterProvider = Provider<RateLimiter>((ref) {
+//   return RateLimiter();
+// });
 
-// Repository Providers
-final userRepositoryProvider = Provider<UserRepository>((ref) {
-  final firestore = ref.watch(firebaseFirestoreProvider);
-  final auth = ref.watch(firebaseAuthProvider);
-  return UserRepository(firestore: firestore, auth: auth);
-});
+// Repository Providers (placeholder - repositories are abstract interfaces)
+// final userRepositoryProvider = Provider<UserRepository>((ref) {
+//   final firestore = ref.watch(firebaseFirestoreProvider);
+//   final auth = ref.watch(firebaseAuthProvider);
+//   return UserRepository(firestore: firestore, auth: auth);
+// });
 
-final teamRepositoryProvider = Provider<BaseRepository<Team>>((ref) {
-  final firestore = ref.watch(firebaseFirestoreProvider);
-  return TeamRepository(firestore: firestore);
-});
+// final teamRepositoryProvider = Provider<BaseRepository<TeamModel>>((ref) {
+//   final firestore = ref.watch(firebaseFirestoreProvider);
+//   return TeamRepository(firestore: firestore);
+// });
 
-final gameRepositoryProvider = Provider<BaseRepository<Game>>((ref) {
-  final firestore = ref.watch(firebaseFirestoreProvider);
-  return GameRepository(firestore: firestore);
-});
+// final gameRepositoryProvider = Provider<BaseRepository<GameModel>>((ref) {
+//   final firestore = ref.watch(firebaseFirestoreProvider);
+//   return GameRepository(firestore: firestore);
+// });
 
 // Service Providers
 final userServiceProvider = Provider<UserServiceInterface>((ref) {
-  final userRepository = ref.watch(userRepositoryProvider);
-  final cacheManager = ref.watch(cacheManagerProvider);
-  final rateLimiter = ref.watch(rateLimiterProvider);
-  return UserService(
-    userRepository: userRepository,
-    cacheManager: cacheManager,
-    rateLimiter: rateLimiter,
-  );
+  return UserService();
 });
 
 final teamServiceProvider = Provider<TeamServiceInterface>((ref) {
@@ -126,7 +118,7 @@ enum AuthState {
 }
 
 // Controller Providers
-final userProfileControllerProvider = AsyncNotifierProvider<UserProfileController, UserProfile?>(() {
+final userProfileControllerProvider = AsyncNotifierProvider<UserProfileController, UserModel?>(() {
   return UserProfileController();
 });
 
@@ -135,12 +127,12 @@ final authControllerProvider = StateNotifierProvider<AuthController, AsyncValue<
   return AuthController(auth);
 });
 
-final teamControllerProvider = StateNotifierProvider<TeamController, AsyncValue<List<Team>>>((ref) {
+final teamControllerProvider = StateNotifierProvider<TeamController, AsyncValue<List<TeamModel>>>((ref) {
   final teamService = ref.watch(teamServiceProvider);
   return TeamController(teamService);
 });
 
-final gameFeedControllerProvider = StateNotifierProvider<GameFeedController, AsyncValue<List<Game>>>((ref) {
+final gameFeedControllerProvider = StateNotifierProvider<GameFeedController, AsyncValue<List<GameModel>>>((ref) {
   final gameService = ref.watch(gameServiceProvider);
   return GameFeedController(gameService);
 });
@@ -154,36 +146,33 @@ final isAuthenticatedProvider = Provider<bool>((ref) {
   );
 });
 
-final currentUserProfileProvider = Provider<AsyncValue<UserProfile?>>((ref) {
+final currentUserProfileProvider = Provider<AsyncValue<UserModel?>>((ref) {
   return ref.watch(userProfileControllerProvider);
 });
 
-final userTeamsProvider = Provider<AsyncValue<List<Team>>>((ref) {
+final userTeamsProvider = Provider<AsyncValue<List<TeamModel>>>((ref) {
   return ref.watch(teamControllerProvider);
 });
 
-final gameFeedProvider = Provider<AsyncValue<List<Game>>>((ref) {
+final gameFeedProvider = Provider<AsyncValue<List<GameModel>>>((ref) {
   return ref.watch(gameFeedControllerProvider);
 });
 
 // Cache and Performance Providers
-final cacheStatsProvider = Provider<Map<String, dynamic>>((ref) {
-  final cacheManager = ref.watch(cacheManagerProvider);
+final cacheStatsProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  final cacheManager = await ref.watch(cacheManagerProvider.future);
   return cacheManager.getStats();
 });
 
-final rateLimitStatsProvider = Provider<Map<String, dynamic>>((ref) {
-  final rateLimiter = ref.watch(rateLimiterProvider);
-  return rateLimiter.getStats();
-});
+// final rateLimitStatsProvider = Provider<Map<String, dynamic>>((ref) {
+//   final rateLimiter = ref.watch(rateLimiterProvider);
+//   return rateLimiter.getStats();
+// });
 
 // Provider for managing cache cleanup
 final cacheCleanupProvider = Provider<Future<void> Function()>((ref) {
-  final cacheManager = ref.watch(cacheManagerProvider);
-  final rateLimiter = ref.watch(rateLimiterProvider);
-  
   return () async {
+    final cacheManager = await ref.read(cacheManagerProvider.future);
     await cacheManager.cleanup();
-    rateLimiter.cleanup();
   };
 });

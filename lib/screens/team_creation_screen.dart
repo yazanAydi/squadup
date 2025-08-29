@@ -6,6 +6,7 @@ import '../widgets/common/app_button.dart';
 import '../services/service_locator.dart';
 
 import '../widgets/modern_input_field.dart';
+import '../models/team_model.dart';
 
 class TeamCreationScreen extends ConsumerStatefulWidget {
   const TeamCreationScreen({super.key});
@@ -127,9 +128,17 @@ class _TeamCreationScreenState extends ConsumerState<TeamCreationScreen> {
       };
 
       // Create team using service
-      final success = await teamService.createTeam(teamData);
+      final teamModel = TeamModel(
+        id: 'team_${DateTime.now().millisecondsSinceEpoch}',
+        name: (teamData['name'] as String?) ?? '',
+        sport: (teamData['sport'] as String?) ?? '',
+        city: (teamData['city'] as String?) ?? '',
+        maxMembers: (teamData['maxMembers'] as int?) ?? 10,
+        createdBy: (teamData['createdBy'] as String?) ?? '',
+      );
+      final teamId = await teamService.createTeam(teamModel);
       
-      if (success && mounted) {
+      if (teamId.isNotEmpty && mounted) {
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

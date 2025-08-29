@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../utils/page_transitions.dart';
 import '../utils/safe_text.dart';
 import '../utils/cache_manager.dart';
+import '../services/service_locator.dart';
+import '../models/user_model.dart';
 import 'home_screen.dart';
 
 class OnboardingWizardScreen extends StatefulWidget {
@@ -246,28 +247,40 @@ class _OnboardingWizardScreenState extends State<OnboardingWizardScreen>
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
-      // Update user document
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .set({
-        'displayName': _displayName,
-        'photoURL': _photoURL,
-        'sports': _selectedSports,
-        'skillLevel': _skillLevel,
-        'city': _location,
-        'goals': _goals,
-        'preferredLanguage': _selectedLanguage,
-        'isOnboardingCompleted': true,
-        'createdAt': Timestamp.now(),
-        'updatedAt': Timestamp.now(),
-        'id': user.uid,
-        'email': user.email,
-      }, SetOptions(merge: true));
+      // Create UserModel with proper structure
+      final userModel = UserModel(
+        id: user.uid,
+        email: user.email ?? '',
+        displayName: _displayName,
+        username: _displayName.toLowerCase().replaceAll(' ', '_'),
+        bio: _goals.isNotEmpty ? _goals.join(', ') : null,
+        city: _location,
+        country: null, // Could be added to onboarding if needed
+        profileImageUrl: _photoURL,
+        sports: _selectedSports,
+        preferences: {
+          'language': _selectedLanguage,
+          'isOnboardingCompleted': 'true',
+        },
+        statistics: {},
+        teams: [],
+        games: [],
+        friends: [],
+        blockedUsers: [],
+        isVerified: false,
+        isOnline: true,
+        lastSeen: DateTime.now(),
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      // Use UserService to create/update user profile
+      final userService = ServiceLocator.instance.userService;
+      await userService.createUser(userModel);
 
       // Clear user cache to ensure fresh data on next sign-in
-      final cacheManager = CacheManager();
-      await cacheManager.remove(CacheKeys.userProfileKey(user.uid));
+      final cacheManager = await CacheManager.getInstance();
+      await cacheManager.removeData('user_profile_${user.uid}');
 
       if (mounted) {
         Navigator.of(context).pushReplacement(
@@ -1062,18 +1075,46 @@ class _OnboardingWizardScreenState extends State<OnboardingWizardScreen>
                   ),
                 ),
 
-                // Navigation Buttons
-                Padding(
-                  padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.05),
-                  child: Row(
-                    children: [
-                      if (_currentStep > 0)
+                // Navigation Buttons (only show for steps 1-5, not for welcome step)
+                if (_currentStep > 0)
+                  Padding(
+                    padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.05),
+                    child: Row(
+                      children: [
+                        if (_currentStep > 0)
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: _previousStep,
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Theme.of(context).colorScheme.onSurface,
+                                side: BorderSide(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3)),
+                                padding: EdgeInsets.symmetric(
+                                  vertical: MediaQuery.of(context).size.height * 0.02,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: SafeButtonText(
+                                'Back',
+                                style: TextStyle(
+                                  fontSize: MediaQuery.of(context).size.width * 0.04,
+                                ),
+                              ),
+                            ),
+                          ),
+                        
+                        if (_currentStep > 0) 
+                          SizedBox(width: MediaQuery.of(context).size.width * 0.04),
+                        
                         Expanded(
-                          child: OutlinedButton(
-                            onPressed: _previousStep,
-                            style: OutlinedButton.styleFrom(
+                          child: ElevatedButton(
+                            onPressed: _currentStep == 5 
+                                ? (_isLoading ? null : _completeOnboarding)
+                                : _nextStep,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Theme.of(context).colorScheme.primary,
                               foregroundColor: Theme.of(context).colorScheme.onSurface,
-                              side: BorderSide(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3)),
                               padding: EdgeInsets.symmetric(
                                 vertical: MediaQuery.of(context).size.height * 0.02,
                               ),
@@ -1081,54 +1122,27 @@ class _OnboardingWizardScreenState extends State<OnboardingWizardScreen>
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
-                            child: SafeButtonText(
-                              'Back',
-                              style: TextStyle(
-                                fontSize: MediaQuery.of(context).size.width * 0.04,
-                              ),
-                            ),
+                            child: _isLoading
+                                ? SizedBox(
+                                    width: MediaQuery.of(context).size.width * 0.05,
+                                    height: MediaQuery.of(context).size.width * 0.05,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.onSurface),
+                                    ),
+                                  )
+                                : SafeButtonText(
+                                    _currentStep == 5 ? 'Complete Setup' : 'Next',
+                                    style: TextStyle(
+                                      fontSize: MediaQuery.of(context).size.width * 0.04,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                           ),
                         ),
-                      
-                      if (_currentStep > 0) 
-                        SizedBox(width: MediaQuery.of(context).size.width * 0.04),
-                      
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: _currentStep == 5 
-                              ? (_isLoading ? null : _completeOnboarding)
-                              : _nextStep,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Theme.of(context).colorScheme.primary,
-                            foregroundColor: Theme.of(context).colorScheme.onSurface,
-                            padding: EdgeInsets.symmetric(
-                              vertical: MediaQuery.of(context).size.height * 0.02,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: _isLoading
-                              ? SizedBox(
-                                  width: MediaQuery.of(context).size.width * 0.05,
-                                  height: MediaQuery.of(context).size.width * 0.05,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.onSurface),
-                                  ),
-                                )
-                              : SafeButtonText(
-                                  _currentStep == 5 ? 'Complete Setup' : 'Next',
-                                  style: TextStyle(
-                                    fontSize: MediaQuery.of(context).size.width * 0.04,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
               ],
             ),
           ),

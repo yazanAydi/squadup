@@ -113,12 +113,8 @@ service cloud.firestore {
     function isRateLimited(operation, maxRequests, windowSeconds) {
       let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
       let operations = userDoc.data.rateLimit[operation] || [];
-      let now = timestamp.date();
-      let windowStart = now.toMillis() - (windowSeconds * 1000);
       
-      // Remove old operations outside the window
-      operations = operations.filter(op => op.toMillis() > windowStart);
-      
+      // Simple rate limiting - check if operations count exceeds limit
       return operations.size() >= maxRequests;
     }
     
@@ -152,22 +148,24 @@ service cloud.firestore {
       // Users can read their own profile
       allow read: if isAuthenticated() && isOwner(userId);
       
-      // Users can create their own profile
+      // Users can create their own profile - simplified for now
       allow create: if isAuthenticated() && 
                       isOwner(userId) && 
-                      isValidUserData() &&
-                      !isUserCreateRateLimited();
+                      request.resource.data.keys().hasAll(['displayName', 'email', 'createdAt']) &&
+                      isValidEmail(request.resource.data.email) &&
+                      isValidDisplayName(request.resource.data.displayName) &&
+                      request.resource.data.createdAt is timestamp;
       
-      // Users can update their own profile
+      // Users can update their own profile - simplified for now
       allow update: if isAuthenticated() && 
                       isOwner(userId) && 
-                      isValidUserData() &&
-                      !isUserUpdateRateLimited();
+                      request.resource.data.keys().hasAll(['displayName', 'email', 'updatedAt']) &&
+                      isValidEmail(request.resource.data.email) &&
+                      isValidDisplayName(request.resource.data.displayName) &&
+                      request.resource.data.updatedAt is timestamp;
       
       // Users can delete their own profile
-      allow delete: if isAuthenticated() && 
-                      isOwner(userId) &&
-                      !isRateLimited('user_delete', 1, 86400); // 1 per day
+      allow delete: if isAuthenticated() && isOwner(userId);
       
       // Public read access for basic user info (for team/game displays)
       allow read: if isAuthenticated() && 

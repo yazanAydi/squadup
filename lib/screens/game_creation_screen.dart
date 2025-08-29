@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../models/game_model.dart';
 import '../models/game.dart';
 import '../services/service_locator.dart';
 import '../widgets/common/app_button.dart';
@@ -264,31 +265,25 @@ class _GameCreationScreenState extends ConsumerState<GameCreationScreen> {
         _scheduledTime.minute,
       );
 
-      final endDateTime = scheduledDateTime.add(Duration(hours: _durationHours));
-
-      final game = Game.create(
-        title: _titleController.text.trim(),
+      final game = GameModel(
+        id: 'game_${DateTime.now().millisecondsSinceEpoch}',
+        name: _titleController.text.trim(),
         description: _descriptionController.text.trim(),
-        scheduledTime: scheduledDateTime,
-        endTime: endDateTime,
-        location: _location!,
         sport: _selectedSport,
-        skillLevel: _selectedSkillLevel,
+        createdBy: FirebaseAuth.instance.currentUser?.uid ?? 'anonymous',
+        location: _location!.address,
+        gameDateTime: scheduledDateTime,
         maxPlayers: _maxPlayers,
         minPlayers: _minPlayers,
         price: _price,
         currency: _selectedCurrency,
-        rules: _rules,
-        createdBy: FirebaseAuth.instance.currentUser?.uid ?? 'anonymous',
-        tags: _tags,
-        isPrivate: _isPrivate,
-        requiresCheckIn: _requiresCheckIn,
-        checkInDeadline: _checkInDeadline,
+        isPublic: !_isPrivate,
+        createdAt: DateTime.now(),
       );
 
       // Get game service from service locator
       final gameService = ServiceLocator.instance.gameService;
-      final gameId = await gameService.createGame(game.toFirestore());
+      final gameId = await gameService.createGame(game);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

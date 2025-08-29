@@ -1,61 +1,82 @@
-import 'dart:async';
-import '../../models/team.dart';
+import '../../models/team_model.dart';
 
+/// Team service interface following Clean Architecture principles
 abstract class TeamServiceInterface {
-  /// Get pending team invitations count for current user
-  Future<int> getPendingInvitationsCount();
+  /// Get all teams
+  Future<List<TeamModel>> getAllTeams();
   
-  /// Get pending team invitations count for a specific user
-  Future<int> countPendingInvitationsFor(String uid);
+  /// Get team by ID
+  Future<TeamModel?> getTeamById(String teamId);
   
-  /// Get user's teams
-  Future<List<Map<String, dynamic>>> getUserTeams();
+  /// Get teams by sport
+  Future<List<TeamModel>> getTeamsBySport(String sport);
   
-  /// Get all teams stream for real-time updates
-  Stream<List<Team>> getTeamsStream();
+  /// Get teams by location
+  Future<List<TeamModel>> getTeamsByLocation(String location);
   
-  /// Create a new team
-  Future<bool> createTeam(Map<String, dynamic> teamData);
+  /// Get teams by creator
+  Future<List<TeamModel>> getTeamsByCreator(String creatorId);
   
-  /// Join a team
-  Future<bool> joinTeam(String teamId);
+  /// Search teams by query
+  Future<List<TeamModel>> searchTeams(String query);
   
-  /// Leave a team
-  Future<bool> leaveTeam(String teamId);
+  /// Create new team
+  Future<String> createTeam(TeamModel team);
   
-  /// Get team details
-  Future<Map<String, dynamic>?> getTeamDetails(String teamId);
+  /// Update team
+  Future<void> updateTeam(String teamId, TeamModel team);
   
-  /// Get pending invitations for current user
-  Future<List<Map<String, dynamic>>> getPendingInvitations();
+  /// Delete team
+  Future<void> deleteTeam(String teamId);
   
-  /// Accept a team invitation
-  Future<bool> acceptInvitation(String teamId);
+  /// Add member to team
+  Future<void> addMember(String teamId, String userId);
   
-  /// Decline a team invitation
-  Future<bool> declineInvitation(String teamId);
+  /// Remove member from team
+  Future<void> removeMember(String teamId, String userId);
   
   /// Get team members
-  Future<List<Map<String, dynamic>>> getTeamMembers(String teamId);
+  Future<List<String>> getTeamMembers(String teamId);
   
-  /// Get pending requests for a team
-  Future<List<Map<String, dynamic>>> getTeamPendingRequests(String teamId);
+  /// Add pending request
+  Future<void> addPendingRequest(String teamId, String userId);
   
-  /// Invite a member to a team
-  Future<bool> inviteMember(String teamId, String email);
+  /// Remove pending request
+  Future<void> removePendingRequest(String teamId, String userId);
   
-  /// Accept a join request
-  Future<bool> acceptRequest(String teamId, String userId);
+  /// Get pending requests
+  Future<List<String>> getPendingRequests(String teamId);
   
-  /// Reject a join request
-  Future<bool> rejectRequest(String teamId, String userId);
+  /// Update team statistics
+  Future<void> updateTeamStats(String teamId, Map<String, dynamic> stats);
   
-  /// Remove a member from a team
-  Future<bool> removeMember(String teamId, String userId);
+  /// Check if user is team member
+  Future<bool> isTeamMember(String teamId, String userId);
   
-  /// Delete a team
-  Future<bool> deleteTeam(String teamId);
+  /// Check if user is team owner
+  Future<bool> isTeamOwner(String teamId, String userId);
   
-  /// Send a join request to a team
-  Future<bool> sendJoinRequest(String teamId);
+  /// Get pending invitations count for user
+  Future<int> getPendingInvitationsCount(String userId);
+  
+  /// Join team (for compatibility)
+  Future<bool> joinTeam(String teamId);
+  
+  /// Get teams stream
+  Stream<List<TeamModel>> getTeamsStream();
+  
+  /// Leave team
+  Future<bool> leaveTeam(String teamId);
+  
+  /// Get user teams
+  Future<List<TeamModel>> getUserTeams(String userId);
+  
+  /// Get pending invitations
+  Future<List<Map<String, dynamic>>> getPendingInvitations();
+  
+  /// Accept invitation
+  Future<bool> acceptInvitation(String teamId);
+  
+  /// Decline invitation
+  Future<bool> declineInvitation(String teamId);
 }

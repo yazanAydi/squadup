@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/di/providers.dart';
+import '../models/team_model.dart';
+import '../models/game_model.dart';
 
 class ExampleControllerUsageScreen extends ConsumerWidget {
   const ExampleControllerUsageScreen({super.key});
@@ -76,7 +78,7 @@ class ExampleControllerUsageScreen extends ConsumerWidget {
                           ? Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('Name: ${profile.displayName ?? "Not set"}'),
+                                Text('Name: ${profile.displayName}'),
                                 Text('City: ${profile.city ?? "Not set"}'),
                                 Text('Teams: ${profile.teams.length}'),
                                 Text('Sports: ${profile.sports.length}'),
@@ -85,7 +87,7 @@ class ExampleControllerUsageScreen extends ConsumerWidget {
                                   onPressed: () {
                                     ref
                                         .read(userProfileControllerProvider.notifier)
-                                        .updateLocation('New York');
+                                        .updateLocation('user123', {'city': 'New York', 'state': 'NY'});
                                   },
                                   child: const Text('Update Location to NY'),
                                 ),
@@ -129,15 +131,14 @@ class ExampleControllerUsageScreen extends ConsumerWidget {
                     const SizedBox(height: 8),
                     ElevatedButton(
                       onPressed: () {
-                        ref.read(teamControllerProvider.notifier).createTeam({
-                          'name': 'New Team ${DateTime.now().millisecondsSinceEpoch}',
-                          'sport': 'Basketball',
-                          'city': 'Local City',
-                          'skillLevel': 'Beginner',
-                          'description': 'A sample team for testing',
-                          'maxMembers': 15,
-                          'createdBy': 'current-user-id',
-                        });
+                        ref.read(teamControllerProvider.notifier).createTeam(TeamModel(
+                          id: 'team_${DateTime.now().millisecondsSinceEpoch}',
+                          name: 'New Team ${DateTime.now().millisecondsSinceEpoch}',
+                          sport: 'Basketball',
+                          city: 'Local City',
+                          maxMembers: 15,
+                          createdBy: 'current-user-id',
+                        ));
                       },
                       child: const Text('Create Sample Team'),
                     ),

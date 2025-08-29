@@ -1,5 +1,3 @@
-// dart format width=80
-
 /// GENERATED CODE - DO NOT MODIFY BY HAND
 /// *****************************************************
 ///  FlutterGen
@@ -7,41 +5,37 @@
 
 // coverage:ignore-file
 // ignore_for_file: type=lint
-// ignore_for_file: deprecated_member_use,directives_ordering,implicit_dynamic_list_literal,unnecessary_import
+// ignore_for_file: directives_ordering,unnecessary_import,implicit_dynamic_list_literal,deprecated_member_use
 
 import 'package:flutter/widgets.dart';
 
 class $AssetsIconsGen {
   const $AssetsIconsGen();
 
-  /// File path: assets/icons/ball.png
-  AssetGenImage get ball => const AssetGenImage('assets/icons/ball.png');
-
-  /// File path: assets/icons/basketball.png
-  AssetGenImage get basketball =>
-      const AssetGenImage('assets/icons/basketball.png');
-
-  /// File path: assets/icons/volleyball.png
-  AssetGenImage get volleyball =>
-      const AssetGenImage('assets/icons/volleyball.png');
+  /// File path: assets/icons/app_icon.png
+  AssetGenImage get appIcon => const AssetGenImage('assets/icons/app_icon.png');
 
   /// List of all assets
-  List<AssetGenImage> get values => [ball, basketball, volleyball];
+  List<AssetGenImage> get values => [appIcon];
 }
 
 class $AssetsImagesGen {
   const $AssetsImagesGen();
 
-  /// File path: assets/images/logoo.png
-  AssetGenImage get logoo => const AssetGenImage('assets/images/logoo.png');
+  /// File path: assets/images/logo.png
+  AssetGenImage get logo => const AssetGenImage('assets/images/logo.png');
 
   /// List of all assets
-  List<AssetGenImage> get values => [logoo];
+  List<AssetGenImage> get values => [logo];
 }
 
 class Assets {
   const Assets._();
 
+  static const AssetGenImage ballIcon = AssetGenImage('assets/ball_icon.png');
+  static const AssetGenImage basketballIcon = AssetGenImage(
+    'assets/basketball_icon.png',
+  );
   static const AssetGenImage defaultAvatar = AssetGenImage(
     'assets/default_avatar.png',
   );
@@ -50,24 +44,27 @@ class Assets {
   );
   static const $AssetsIconsGen icons = $AssetsIconsGen();
   static const $AssetsImagesGen images = $AssetsImagesGen();
+  static const AssetGenImage volleyballIcon = AssetGenImage(
+    'assets/volleyball_icon.png',
+  );
 
   /// List of all assets
-  static List<AssetGenImage> get values => [defaultAvatar, googleLogo];
+  static List<AssetGenImage> get values => [
+    ballIcon,
+    basketballIcon,
+    defaultAvatar,
+    googleLogo,
+    volleyballIcon,
+  ];
 }
 
 class AssetGenImage {
-  const AssetGenImage(
-    this._assetName, {
-    this.size,
-    this.flavors = const {},
-    this.animation,
-  });
+  const AssetGenImage(this._assetName, {this.size, this.flavors = const {}});
 
   final String _assetName;
 
   final Size? size;
   final Set<String> flavors;
-  final AssetGenImageAnimation? animation;
 
   Image image({
     Key? key,
@@ -129,16 +126,4 @@ class AssetGenImage {
   String get path => _assetName;
 
   String get keyName => _assetName;
-}
-
-class AssetGenImageAnimation {
-  const AssetGenImageAnimation({
-    required this.isAnimation,
-    required this.duration,
-    required this.frames,
-  });
-
-  final bool isAnimation;
-  final Duration duration;
-  final int frames;
 }

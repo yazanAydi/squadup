@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../core/theme/app_colors.dart';
-import '../widgets/common/squadup_logo.dart';
+import '../app/theme.dart';
 import 'auth_screen.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -136,18 +135,18 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: SquadUpTheme.scaffold,
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              AppColors.background,
-              AppColors.background,
-              AppColors.surface.withValues(alpha: 0.1),
+              SquadUpTheme.scaffold,
+              SquadUpTheme.scaffold.withValues(alpha: 0.8),
+              SquadUpTheme.surfaceContainer,
             ],
-            stops: const [0.0, 0.8, 1.0],
+            stops: const [0.0, 0.6, 1.0],
           ),
         ),
         child: Stack(
@@ -168,8 +167,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                         shape: BoxShape.circle,
                         gradient: RadialGradient(
                           colors: [
-                            AppColors.primary.withValues(alpha: 0.1 * _glowAnimation.value),
-                            AppColors.primary.withValues(alpha: 0.05 * _glowAnimation.value),
+                            SquadUpTheme.primary.withValues(alpha: 0.1 * _glowAnimation.value),
+                            SquadUpTheme.primary.withValues(alpha: 0.05 * _glowAnimation.value),
                             Colors.transparent,
                           ],
                         ),
@@ -195,8 +194,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                         shape: BoxShape.circle,
                         gradient: RadialGradient(
                           colors: [
-                            AppColors.primaryLight.withValues(alpha: 0.08 * _glowAnimation.value),
-                            AppColors.primaryLight.withValues(alpha: 0.04 * _glowAnimation.value),
+                            SquadUpTheme.accentGlow.withValues(alpha: 0.08 * _glowAnimation.value),
+                            SquadUpTheme.accentGlow.withValues(alpha: 0.04 * _glowAnimation.value),
                             Colors.transparent,
                           ],
                         ),
@@ -212,7 +211,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Enhanced logo container with animations
+                  // Logo with logoo.png image and purple gradient background
                   AnimatedBuilder(
                     animation: Listenable.merge([_scaleAnimation, _slideAnimation]),
                     builder: (context, child) {
@@ -221,34 +220,39 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                         child: Transform.translate(
                           offset: _slideAnimation.value,
                           child: Container(
-                            padding: const EdgeInsets.all(40),
+                            width: 100,
+                            height: 100,
                             decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(40),
-                              gradient: LinearGradient(
+                              borderRadius: BorderRadius.circular(25),
+                              gradient: const LinearGradient(
                                 colors: [
-                                  AppColors.primary.withValues(alpha: 0.15),
-                                  AppColors.primary.withValues(alpha: 0.05),
+                                  SquadUpTheme.primary,
+                                  SquadUpTheme.accentGlow,
                                 ],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.primary.withValues(alpha: 0.3),
-                                  blurRadius: 40,
-                                  spreadRadius: 10,
+                                  color: SquadUpTheme.primary.withValues(alpha: 0.4),
+                                  blurRadius: 30,
+                                  spreadRadius: 5,
                                 ),
                                 BoxShadow(
-                                  color: AppColors.primaryLight.withValues(alpha: 0.2),
-                                  blurRadius: 60,
-                                  spreadRadius: 20,
+                                  color: SquadUpTheme.accentGlow.withValues(alpha: 0.3),
+                                  blurRadius: 50,
+                                  spreadRadius: 10,
                                 ),
                               ],
                             ),
-                            child: const SquadUpLogo(
-                              size: 120.0,
-                              showGlow: true,
-                              isIconOnly: false,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(25),
+                              child: Image.asset(
+                                'assets/logoo.png',
+                                width: 100,
+                                height: 100,
+                                fit: BoxFit.cover,
+                              ),
                             ),
                           ),
                         ),
@@ -258,7 +262,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                   
                   const SizedBox(height: 40),
                   
-                  // App name with enhanced styling and animations
+                  // App name with purple styling
                   AnimatedBuilder(
                     animation: Listenable.merge([_fadeAnimation, _slideAnimation]),
                     builder: (context, child) {
@@ -266,27 +270,20 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                         offset: _slideAnimation.value,
                         child: FadeTransition(
                           opacity: _fadeAnimation,
-                          child: ShaderMask(
-                            shaderCallback: (bounds) => LinearGradient(
-                              colors: AppColors.logoGradient,
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ).createShader(bounds),
-                            child: Text(
-                              'SquadUp',
-                              style: TextStyle(
-                                fontSize: 36.0,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white,
-                                letterSpacing: -1.0,
-                                shadows: [
-                                  Shadow(
-                                    color: AppColors.primary.withValues(alpha: 0.5),
-                                    blurRadius: 20,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
+                          child: Text(
+                            'SquadUp',
+                            style: TextStyle(
+                              fontSize: 36.0,
+                              fontWeight: FontWeight.w900,
+                              color: SquadUpTheme.primary,
+                              letterSpacing: -1.0,
+                              shadows: [
+                                Shadow(
+                                  color: SquadUpTheme.primary.withValues(alpha: 0.5),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -296,7 +293,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                   
                   const SizedBox(height: 16),
                   
-                  // Tagline with enhanced styling and animations
+                  // Tagline with white text
                   AnimatedBuilder(
                     animation: Listenable.merge([_fadeAnimation, _slideAnimation]),
                     builder: (context, child) {
@@ -309,7 +306,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                             style: TextStyle(
                               fontSize: 16.0,
                               fontWeight: FontWeight.w600,
-                              color: AppColors.textSecondary,
+                              color: SquadUpTheme.textPrimary,
                               letterSpacing: 1.2,
                             ),
                           ),
@@ -320,7 +317,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                   
                   const SizedBox(height: 60),
                   
-                  // Enhanced loading indicator
+                  // Loading indicator in card-like container
                   AnimatedBuilder(
                     animation: _fadeAnimation,
                     builder: (context, child) {
@@ -329,12 +326,19 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                         child: Container(
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
-                            color: AppColors.surface.withValues(alpha: 0.3),
-                            borderRadius: BorderRadius.circular(24),
+                            color: SquadUpTheme.card,
+                            borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: AppColors.primary.withValues(alpha: 0.2),
+                              color: SquadUpTheme.outline.withValues(alpha: 0.2),
                               width: 1,
                             ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: SquadUpTheme.primary.withValues(alpha: 0.1),
+                                blurRadius: 10,
+                                spreadRadius: 2,
+                              ),
+                            ],
                           ),
                           child: Column(
                             children: [
@@ -344,16 +348,16 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                                 child: CircularProgressIndicator(
                                   strokeWidth: 3,
                                   valueColor: AlwaysStoppedAnimation<Color>(
-                                    AppColors.primary,
+                                    SquadUpTheme.primary,
                                   ),
-                                  backgroundColor: AppColors.primary.withValues(alpha: 0.2),
+                                  backgroundColor: SquadUpTheme.primary.withValues(alpha: 0.2),
                                 ),
                               ),
                               const SizedBox(height: 16),
                               Text(
                                 'Loading...',
                                 style: TextStyle(
-                                  color: AppColors.textSecondary,
+                                  color: SquadUpTheme.textPrimary,
                                   fontSize: 14,
                                   fontWeight: FontWeight.w500,
                                 ),

@@ -338,7 +338,7 @@ class _GameFinderScreenState extends State<GameFinderScreen>
     setState(() => _isLoading = true);
     try {
       final games = await _gameService.getAllGames();
-      setState(() => _games = games);
+      setState(() => _games = games.map((game) => game.toJson()).toList());
       _applyFilters();
     } catch (e) {
       if (mounted) {

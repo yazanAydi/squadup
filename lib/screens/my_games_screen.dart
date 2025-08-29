@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/interfaces/game_service_interface.dart';
 import '../services/service_locator.dart';
-import '../utils/page_transitions.dart';
 import 'game_creation_screen.dart';
-import 'game_finder_screen.dart';
+import 'game_discovery_screen.dart';
 import '../core/theme/app_colors.dart';
 
 class MyGamesScreen extends StatefulWidget {
@@ -73,18 +72,18 @@ class _MyGamesScreenState extends State<MyGamesScreen>
       final createdGames = await _gameService.getGamesByCreator(uid);
       _createdGames = createdGames.map((game) {
         return {
-          'id': game['id'],
-          'name': game['name'] ?? 'Unknown Game',
-          'sport': game['sport'] ?? 'Unknown Sport',
-          'gameType': game['gameType'] ?? 'Unknown Type',
-          'location': game['location'] ?? 'Unknown Location',
-          'gameDateTime': game['gameDateTime'],
-          'maxPlayers': game['maxPlayers'] ?? 0,
-          'currentPlayers': game['currentPlayers'] ?? 0,
-          'status': game['status'] ?? 'open',
-          'isPrivate': game['isPrivate'] ?? false,
-          'isFree': game['isFree'] ?? true,
-          'entryFee': game['entryFee'] ?? 0.0,
+          'id': game.id,
+          'name': game.name,
+          'sport': game.sport,
+          'gameType': game.type.name,
+          'location': game.location ?? 'Unknown Location',
+          'gameDateTime': game.gameDateTime,
+          'maxPlayers': game.maxPlayers,
+          'currentPlayers': game.currentPlayers,
+          'status': game.status.name,
+          'isPrivate': !game.isPublic,
+          'isFree': game.isFree,
+          'entryFee': game.price,
         };
       }).toList();
 
@@ -92,18 +91,18 @@ class _MyGamesScreenState extends State<MyGamesScreen>
       final joinedGames = await _gameService.getGamesByPlayer(uid);
       _joinedGames = joinedGames.map((game) {
         return {
-          'id': game['id'],
-          'name': game['name'] ?? 'Unknown Game',
-          'sport': game['sport'] ?? 'Unknown Sport',
-          'gameType': game['gameType'] ?? 'Unknown Type',
-          'location': game['location'] ?? 'Unknown Location',
-          'gameDateTime': game['gameDateTime'],
-          'maxPlayers': game['maxPlayers'] ?? 0,
-          'currentPlayers': game['currentPlayers'] ?? 0,
-          'status': game['status'] ?? 'open',
-          'isPrivate': game['isPrivate'] ?? false,
-          'isFree': game['isFree'] ?? true,
-          'entryFee': game['entryFee'] ?? 0.0,
+          'id': game.id,
+          'name': game.name,
+          'sport': game.sport,
+          'gameType': game.type.name,
+          'location': game.location ?? 'Unknown Location',
+          'gameDateTime': game.gameDateTime,
+          'maxPlayers': game.maxPlayers,
+          'currentPlayers': game.currentPlayers,
+          'status': game.status.name,
+          'isPrivate': !game.isPublic,
+          'isFree': game.isFree,
+          'entryFee': game.price,
         };
       }).toList();
 
@@ -114,7 +113,7 @@ class _MyGamesScreenState extends State<MyGamesScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error loading games: ${e.toString()}'),
-            backgroundColor: AppColors.red,
+            backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
@@ -131,7 +130,7 @@ class _MyGamesScreenState extends State<MyGamesScreen>
         title: Text(
           'Cancel Game',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            color: AppColors.orange,
+            color: AppColors.warning,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -166,7 +165,7 @@ class _MyGamesScreenState extends State<MyGamesScreen>
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: const Text('Game cancelled successfully'),
-              backgroundColor: AppColors.orange,
+              backgroundColor: AppColors.warning,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
@@ -177,7 +176,7 @@ class _MyGamesScreenState extends State<MyGamesScreen>
           ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
             content: Text('Error cancelling game: ${e.toString()}'),
-            backgroundColor: AppColors.red,
+            backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
@@ -195,7 +194,7 @@ class _MyGamesScreenState extends State<MyGamesScreen>
         title: Text(
           'Leave Game',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            color: AppColors.red,
+            color: AppColors.error,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -233,7 +232,7 @@ class _MyGamesScreenState extends State<MyGamesScreen>
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: const Text('Left game successfully'),
-              backgroundColor: AppColors.green,
+              backgroundColor: AppColors.success,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
@@ -244,7 +243,7 @@ class _MyGamesScreenState extends State<MyGamesScreen>
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Error leaving game: ${e.toString()}'),
-              backgroundColor: AppColors.red,
+              backgroundColor: AppColors.error,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
@@ -278,11 +277,11 @@ class _MyGamesScreenState extends State<MyGamesScreen>
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'open':
-        return AppColors.green;
+        return AppColors.success;
       case 'full':
-        return AppColors.orange;
+        return AppColors.warning;
       case 'cancelled':
-        return AppColors.red;
+        return AppColors.error;
       case 'completed':
         return AppColors.primary;
       default:
@@ -453,13 +452,13 @@ class _MyGamesScreenState extends State<MyGamesScreen>
                   Icon(
                     Icons.lock,
                     size: 16,
-                    color: AppColors.orange,
+                    color: AppColors.warning,
                   ),
                   const SizedBox(width: 8),
                   Text(
                     'Private Game',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.orange,
+                      color: AppColors.warning,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -474,13 +473,13 @@ class _MyGamesScreenState extends State<MyGamesScreen>
                   Icon(
                     Icons.attach_money,
                     size: 16,
-                    color: AppColors.green,
+                    color: AppColors.success,
                   ),
                   const SizedBox(width: 8),
                   Text(
                     'Entry Fee: \$${game['entryFee'].toStringAsFixed(2)}',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.green,
+                      color: AppColors.success,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -498,8 +497,8 @@ class _MyGamesScreenState extends State<MyGamesScreen>
                     child: OutlinedButton(
                       onPressed: () => _cancelGame(game['id']),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.orange,
-                        side: BorderSide(color: AppColors.orange.withValues(alpha: 0.6)),
+                        foregroundColor: AppColors.warning,
+                        side: BorderSide(color: AppColors.warning.withValues(alpha: 0.6)),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -516,8 +515,8 @@ class _MyGamesScreenState extends State<MyGamesScreen>
                     child: OutlinedButton(
                       onPressed: () => _leaveGame(game['id']),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.red,
-                        side: BorderSide(color: AppColors.red.withValues(alpha: 0.6)),
+                        foregroundColor: AppColors.error,
+                        side: BorderSide(color: AppColors.error.withValues(alpha: 0.6)),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -708,7 +707,7 @@ class _MyGamesScreenState extends State<MyGamesScreen>
                     onPressed: () {
                       Navigator.pop(context);
                       Navigator.of(context).push(
-                        PageTransitions.slideRight(const GameCreationScreen()),
+                        MaterialPageRoute(builder: (context) => const GameCreationScreen()),
                       );
                     },
                     icon: const Icon(Icons.add, size: 18),
@@ -762,7 +761,7 @@ class _MyGamesScreenState extends State<MyGamesScreen>
                     onPressed: () {
                       Navigator.pop(context);
                       Navigator.of(context).push(
-                        PageTransitions.slideRight(const GameFinderScreen()),
+                        MaterialPageRoute(builder: (context) => const GameDiscoveryScreen()),
                       );
                     },
                     icon: const Icon(Icons.search, size: 18),

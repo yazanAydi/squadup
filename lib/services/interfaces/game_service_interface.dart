@@ -1,71 +1,97 @@
+import '../../models/game_model.dart';
+
+/// Game service interface following Clean Architecture principles
 abstract class GameServiceInterface {
-  /// Get all games with optional force refresh
-  Future<List<Map<String, dynamic>>> getGames({bool forceRefresh = false});
+  /// Get all games
+  Future<List<GameModel>> getAllGames();
   
   /// Get game by ID
-  Future<Map<String, dynamic>?> getGameById(String gameId);
+  Future<GameModel?> getGameById(String gameId);
+  
+  /// Get games by sport
+  Future<List<GameModel>> getGamesBySport(String sport);
+  
+  /// Get games by location
+  Future<List<GameModel>> getGamesByLocation(String location);
+  
+  /// Get games by creator
+  Future<List<GameModel>> getGamesByCreator(String creatorId);
+  
+  /// Get games by date range
+  Future<List<GameModel>> getGamesByDateRange(DateTime start, DateTime end);
+  
+  /// Get upcoming games
+  Future<List<GameModel>> getUpcomingGames();
+  
+  /// Get games by status
+  Future<List<GameModel>> getGamesByStatus(GameStatus status);
+  
+  /// Search games by query
+  Future<List<GameModel>> searchGames(String query);
   
   /// Create new game
-  Future<String?> createGame(Map<String, dynamic> gameData);
+  Future<String> createGame(GameModel game);
   
-  /// Update game information
-  Future<bool> updateGame(String gameId, Map<String, dynamic> gameData);
+  /// Update game
+  Future<void> updateGame(String gameId, GameModel game);
   
   /// Delete game
-  Future<bool> deleteGame(String gameId);
+  Future<void> deleteGame(String gameId);
   
-  /// Search games by query and filters
-  Future<List<Map<String, dynamic>>> searchGames({
-    required String query,
+  /// Add player to game
+  Future<void> addPlayer(String gameId, String userId);
+  
+  /// Remove player from game
+  Future<void> removePlayer(String gameId, String userId);
+  
+  /// Get game players
+  Future<List<String>> getGamePlayers(String gameId);
+  
+  /// Add pending request
+  Future<void> addPendingRequest(String gameId, String userId);
+  
+  /// Remove pending request
+  Future<void> removePendingRequest(String gameId, String userId);
+  
+  /// Get pending requests
+  Future<List<String>> getPendingRequests(String gameId);
+  
+  /// Update game status
+  Future<void> updateGameStatus(String gameId, GameStatus status);
+  
+  /// Update game score
+  Future<void> updateGameScore(String gameId, Map<String, dynamic> score);
+  
+  /// Check if user is game participant
+  Future<bool> isGameParticipant(String gameId, String userId);
+  
+  /// Check if user is game creator
+  Future<bool> isGameCreator(String gameId, String userId);
+  
+  /// Get all games (for compatibility)
+  Future<List<GameModel>> getGames();
+  
+  /// Join a game
+  Future<bool> joinGame(String gameId);
+  
+  /// Leave a game
+  Future<bool> leaveGame(String gameId);
+  
+  /// Search games with filters
+  Future<List<GameModel>> searchGamesWithFilters({
+    String? query,
     String? sport,
     String? type,
     String? location,
     DateTime? date,
-    bool forceRefresh = false,
   });
   
-  /// Join game
-  Future<bool> joinGame(String gameId);
+  /// Get games by player
+  Future<List<GameModel>> getGamesByPlayer(String playerId);
   
-  /// Leave game
-  Future<bool> leaveGame(String gameId);
+  /// Cancel game
+  Future<void> cancelGame(String gameId);
   
-  /// Get game participants
-  Future<List<Map<String, dynamic>>> getGameParticipants(String gameId);
-  
-  /// Get games by sport
-  Future<List<Map<String, dynamic>>> getGamesBySport(String sport);
-  
-  /// Get games by type (pickup, scheduled, tournament)
-  Future<List<Map<String, dynamic>>> getGamesByType(String type);
-  
-  /// Get games by location
-  Future<List<Map<String, dynamic>>> getGamesByLocation(String location);
-  
-  /// Get games by date range
-  Future<List<Map<String, dynamic>>> getGamesByDateRange(DateTime start, DateTime end);
-  
-  /// Get upcoming games
-  Future<List<Map<String, dynamic>>> getUpcomingGames();
-  
-  /// Get past games
-  Future<List<Map<String, dynamic>>> getPastGames();
-  
-  /// Check if user is participating in game
-  Future<bool> isUserInGame(String gameId, String userId);
-  
-  /// Get all games (alias for getGames)
-  Future<List<Map<String, dynamic>>> getAllGames();
-  
-  /// Get games created by a specific user
-  Future<List<Map<String, dynamic>>> getGamesByCreator(String userId);
-  
-  /// Get games that a specific user is participating in
-  Future<List<Map<String, dynamic>>> getGamesByPlayer(String userId);
-  
-  /// Cancel a game (only creator can cancel)
-  Future<bool> cancelGame(String gameId);
-  
-  /// Add a player to a game
-  Future<bool> addPlayerToGame(String gameId, String userId);
+  /// Add player to game (alias for addPlayer)
+  Future<void> addPlayerToGame(String gameId, String userId);
 }

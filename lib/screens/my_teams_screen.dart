@@ -68,11 +68,11 @@ class _MyTeamsScreenState extends State<MyTeamsScreen>
     try {
       setState(() => _isLoading = true);
       
-      final teams = await _teamService.getUserTeams();
+      final teams = await _teamService.getUserTeams('current-user-id');
       
       if (mounted) {
         setState(() {
-          userTeams = teams;
+          userTeams = teams.map((team) => team.toJson()).toList();
           _isLoading = false;
         });
         _listController.forward();

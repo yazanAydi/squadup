@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/team.dart';
+import '../models/team_model.dart';
 import '../services/interfaces/team_service_interface.dart';
 import '../core/di/providers.dart';
 
-class TeamController extends StateNotifier<AsyncValue<List<Team>>> {
+class TeamController extends StateNotifier<AsyncValue<List<TeamModel>>> {
   TeamController(this._teamService) : super(const AsyncValue.loading()) {
     _loadTeams();
   }
@@ -22,10 +22,10 @@ class TeamController extends StateNotifier<AsyncValue<List<Team>>> {
     }
   }
 
-  Future<void> createTeam(Map<String, dynamic> teamData) async {
+  Future<void> createTeam(TeamModel team) async {
     try {
-      final success = await _teamService.createTeam(teamData);
-      if (success) {
+      final teamId = await _teamService.createTeam(team);
+      if (teamId.isNotEmpty) {
         _loadTeams(); // Reload teams instead of using ref
       }
     } catch (e, stack) {
@@ -60,7 +60,7 @@ class TeamController extends StateNotifier<AsyncValue<List<Team>>> {
   }
 }
 
-final teamControllerProvider = StateNotifierProvider<TeamController, AsyncValue<List<Team>>>((ref) {
+final teamControllerProvider = StateNotifierProvider<TeamController, AsyncValue<List<TeamModel>>>((ref) {
   final teamService = ref.watch(teamServiceProvider);
   return TeamController(teamService);
 });

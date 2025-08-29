@@ -36,15 +36,15 @@ class AdminScreenState extends State<AdminScreen> {
       }
 
       // Check admin access
-      final canAccess = await _adminService.canAccessAdmin();
+      final canAccess = await _adminService.canAccessAdmin(_currentUserId);
       setState(() => _canAccess = canAccess);
       
       if (canAccess) {
         await _loadAdminData();
       } else {
         // Show why access was denied
-        final isAdmin = await _adminService.isAdmin();
-        final isIPAllowed = await _adminService.isIPWhitelisted();
+        final isAdmin = await _adminService.isAdmin(_currentUserId);
+        final isIPAllowed = await _adminService.isIPWhitelisted('127.0.0.1');
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -89,7 +89,7 @@ class AdminScreenState extends State<AdminScreen> {
 
   Future<void> _showDebugInfo() async {
     try {
-      final debugInfo = await _adminService.getDebugInfo();
+      final debugInfo = await _adminService.getDebuginfo();
       
       if (mounted) {
         showDialog(

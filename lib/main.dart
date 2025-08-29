@@ -4,14 +4,14 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'core/config/app_config.dart';
+import 'firebase_options.dart';
 import 'core/errors/app_error_handler.dart' show AppErrorHandler, ErrorSeverity;
 import 'core/logging/app_logger.dart';
 import 'core/security/security_dashboard_service.dart';
 import 'services/crash_reporting_service.dart';
 import 'services/analytics_service.dart';
 import 'services/ab_testing_service.dart';
-import 'services/theme_manager.dart';
+import 'app/theme.dart';
 import 'screens/splash_screen.dart';
 import 'l10n/app_localizations.dart';
 import 'providers/localization_provider.dart';
@@ -29,7 +29,7 @@ void main() async {
   try {
     // Initialize Firebase with secure configuration
     await Firebase.initializeApp(
-      options: AppConfig.firebaseOptions,
+      options: DefaultFirebaseOptions.currentPlatform,
     );
     
     // Enable Firestore offline persistence globally
@@ -87,15 +87,11 @@ class MyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentLocale = ref.watch(localizationProvider);
-    final themeMode = ref.watch(themeModeProvider);
-    final themeManager = ref.watch(themeManagerProvider);
     
     return MaterialApp(
       title: 'SquadUp',
       debugShowCheckedModeBanner: false,
-      theme: themeManager.getLightTheme(),
-      darkTheme: themeManager.getDarkTheme(),
-      themeMode: themeMode,
+      theme: SquadUpTheme.getThemeForLocale(currentLocale.languageCode),
       home: const SplashScreen(),
       
       // Localization support following SquadUp rules

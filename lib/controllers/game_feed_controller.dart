@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/game.dart';
+import '../models/game_model.dart';
 import '../services/interfaces/game_service_interface.dart';
 import '../core/di/providers.dart';
 
-class GameFeedController extends StateNotifier<AsyncValue<List<Game>>> {
+class GameFeedController extends StateNotifier<AsyncValue<List<GameModel>>> {
   GameFeedController(this._gameService) : super(const AsyncValue.loading()) {
     _loadGames();
   }
@@ -14,16 +14,16 @@ class GameFeedController extends StateNotifier<AsyncValue<List<Game>>> {
     try {
       state = const AsyncValue.loading();
       final games = await _gameService.getGames();
-      state = AsyncValue.data(games.map((game) => Game.fromJson(game)).toList());
+      state = AsyncValue.data(games);
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
     }
   }
 
-  Future<void> createGame(Map<String, dynamic> gameData) async {
+  Future<void> createGame(GameModel game) async {
     try {
-      final gameId = await _gameService.createGame(gameData);
-      if (gameId != null) {
+      final gameId = await _gameService.createGame(game);
+      if (gameId.isNotEmpty) {
         _loadGames(); // Reload games
       }
     } catch (e, stack) {
@@ -62,14 +62,14 @@ class GameFeedController extends StateNotifier<AsyncValue<List<Game>>> {
   }) async {
     try {
       state = const AsyncValue.loading();
-      final games = await _gameService.searchGames(
+      final games = await _gameService.searchGamesWithFilters(
         query: query,
         sport: sport,
         type: type,
         location: location,
         date: date,
       );
-      state = AsyncValue.data(games.map((game) => Game.fromJson(game)).toList());
+      state = AsyncValue.data(games);
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
     }
@@ -80,7 +80,7 @@ class GameFeedController extends StateNotifier<AsyncValue<List<Game>>> {
   }
 }
 
-final gameFeedControllerProvider = StateNotifierProvider<GameFeedController, AsyncValue<List<Game>>>((ref) {
+final gameFeedControllerProvider = StateNotifierProvider<GameFeedController, AsyncValue<List<GameModel>>>((ref) {
   final gameService = ref.watch(gameServiceProvider);
   return GameFeedController(gameService);
 });

@@ -5,7 +5,7 @@ import '../services/service_locator.dart';
 import 'edit_profile_screen.dart';
 import 'package:flutter/foundation.dart'; // Added for kDebugMode
 import '../utils/safe_text.dart';
-import '../core/theme/app_colors.dart';
+import '../app/theme.dart';
 import 'security_testing_screen.dart';
 import 'auth_screen.dart';
 
@@ -128,13 +128,13 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   Color _levelColor(String level) {
     switch (level.toLowerCase()) {
       case 'beginner':
-        return AppColors.green;
+        return SquadUpTheme.success;
       case 'intermediate':
-        return AppColors.yellow;
+        return Colors.amber;
       case 'advanced':
-        return AppColors.red;
+        return SquadUpTheme.error;
       default:
-        return Theme.of(context).colorScheme.secondary;
+        return SquadUpTheme.primary;
     }
   }
 
@@ -152,18 +152,31 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       return MediaQuery(
         data: MediaQuery.of(context).copyWith(textScaler: textScaler),
         child: Scaffold(
-          backgroundColor: Theme.of(context).colorScheme.surface,
+          backgroundColor: SquadUpTheme.scaffold,
           appBar: AppBar(
-            title: const Text('Profile'),
-            backgroundColor: Colors.transparent,
+            title: Text(
+              'Profile',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: SquadUpTheme.textPrimary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            backgroundColor: SquadUpTheme.scaffold,
             elevation: 0,
+            leading: IconButton(
+              icon: Icon(
+                Icons.arrow_back,
+                color: SquadUpTheme.textPrimary,
+              ),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
           ),
           body: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Theme.of(context).colorScheme.surface, Theme.of(context).colorScheme.surface],
+                colors: [SquadUpTheme.scaffold, SquadUpTheme.surfaceContainer],
               ),
             ),
             child: Center(
@@ -214,13 +227,13 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     return MediaQuery(
       data: MediaQuery.of(context).copyWith(textScaler: textScaler),
       child: Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: SquadUpTheme.scaffold,
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Theme.of(context).colorScheme.surface, Theme.of(context).colorScheme.surface],
+            colors: [SquadUpTheme.scaffold, SquadUpTheme.surfaceContainer],
           ),
         ),
         child: FutureBuilder<Map<String, dynamic>?>(
@@ -529,7 +542,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                               border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.outline.withValues(alpha: 0.3),
+                                  color: SquadUpTheme.outline.withValues(alpha: 0.3),
                                   blurRadius: 12,
                                   offset: const Offset(0, 6),
                                 ),
@@ -546,7 +559,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                                   color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
                                 ),
                                 Expanded(
-                                                                     child: _statCard('MVPs', mvps.toString(), Icons.star, AppColors.yellow),
+                                                                     child: _statCard('MVPs', mvps.toString(), Icons.star, Colors.amber),
                                 ),
                               ],
                             ),
@@ -862,7 +875,7 @@ class _SportsStrip extends StatelessWidget {
         border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
         boxShadow: [
           BoxShadow(
-            color: AppColors.outline.withValues(alpha: 0.2),
+            color: SquadUpTheme.outline.withValues(alpha: 0.2),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
